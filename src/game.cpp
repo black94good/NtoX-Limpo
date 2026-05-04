@@ -531,16 +531,22 @@ bool Game::placeCreature(Creature* creature, const Position& pos, bool extendedP
 		return false;
 	}
 
-	addCreatureCheck(creature);
-
 	const auto& position = creature->getPosition();
 	const auto& tile = creature->getTile();
 
 	SpectatorVec spectators;
 	map.getSpectators(spectators, position, true);
 	for (Creature* spectator : spectators) {
-		spectator->onCreatureAppear(creature, true, magicEffect);
+		if (Player* tmpPlayer = spectator->getPlayer()) {
+			tmpPlayer->sendCreatureAppear(creature, position, magicEffect);
+		}
 	}
+
+	for (Creature* spectator : spectators) {
+		spectator->onCreatureAppear(creature, true);
+	}
+
+	addCreatureCheck(creature);
 
 	tile->postAddNotification(creature, nullptr, 0);
 
