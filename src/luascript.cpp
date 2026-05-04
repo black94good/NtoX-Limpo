@@ -2214,7 +2214,8 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Game", "createNpc", LuaScriptInterface::luaGameCreateNpc);
 	registerMethod(L, "Game", "createTile", LuaScriptInterface::luaGameCreateTile);
 	registerMethod(L, "Game", "createMonsterType", LuaScriptInterface::luaGameCreateMonsterType);
-
+	registerMethod(L, "Game", "getItemByClientId", LuaScriptInterface::luaGameGetItemByClientId); //LONNE TOOLTIP
+	
 	registerMethod(L, "Game", "startEvent", LuaScriptInterface::luaGameStartEvent);
 
 	registerMethod(L, "Game", "getClientVersion", LuaScriptInterface::luaGameGetClientVersion);
@@ -2224,7 +2225,7 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Game", "getAccountStorageValue", LuaScriptInterface::luaGameGetAccountStorageValue);
 	registerMethod(L, "Game", "setAccountStorageValue", LuaScriptInterface::luaGameSetAccountStorageValue);
 	registerMethod(L, "Game", "saveAccountStorageValues", LuaScriptInterface::luaGameSaveAccountStorageValues);
-
+	
 	// Variant
 	registerClass(L, "Variant", "", LuaScriptInterface::luaVariantCreate);
 
@@ -4774,6 +4775,24 @@ int LuaScriptInterface::luaGameCreateMonsterType(lua_State* L) {
 	lua::setMetatable(L, -1, "MonsterType");
 	return 1;
 }
+//lonne -- tooltip /\\/
+int LuaScriptInterface::luaGameGetItemByClientId(lua_State* L)
+{
+	uint32_t clientId = lua::getNumber<uint32_t>(L, 1);
+
+	const ItemType& itemType = Item::items.getItemIdByClientId(clientId);
+
+	if (itemType.id != 0) {
+		lua::pushUserdata<const ItemType>(L, &itemType);
+		lua::setMetatable(L, -1, "ItemType");
+	}
+	else {
+		lua_pushnil(L);
+	}
+
+	return 1;
+}
+//lonne -- tooltip /\\/
 
 int LuaScriptInterface::luaGameStartEvent(lua_State* L) {
 	// Game.startEvent(event)

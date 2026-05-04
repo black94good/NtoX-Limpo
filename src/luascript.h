@@ -323,6 +323,7 @@ class LuaScriptInterface {
 		static int luaGameCreateNpc(lua_State* L);
 		static int luaGameCreateTile(lua_State* L);
 		static int luaGameCreateMonsterType(lua_State* L);
+		static int luaGameGetItemByClientId(lua_State* L); //LONNE TOOLTIP
 
 		static int luaGameStartEvent(lua_State* L);
 
