@@ -396,6 +396,26 @@ bool Spell::configureSpell(const pugi::xml_node& node) {
 			std::cout << "[Warning - Spell::configureSpell] Unknown group: " << attr.as_string() << std::endl;
 		}
 	}
+	
+	//LONNE ELEMENTO
+	if ((attr = node.attribute("element"))) {
+		std::string tmpStr = boost::algorithm::to_lower_copy<std::string>(attr.as_string());
+		if (tmpStr == "none" || tmpStr == "0") {
+			element = ELEMENTGROUP_NONE;
+		} else if (tmpStr == "katon" || tmpStr == "1") {
+			element = ELEMENTGROUP_KATON;
+		} else if (tmpStr == "raiton" || tmpStr == "2") {
+			element = ELEMENTGROUP_RAITON;
+		} else if (tmpStr == "doton" || tmpStr == "3") {
+			element = ELEMENTGROUP_DOTON;
+		} else if (tmpStr == "suiton" || tmpStr == "4") {
+			element = ELEMENTGROUP_SUITON;
+		} else if (tmpStr == "fuuton" || tmpStr == "5") {
+			element = ELEMENTGROUP_FUUTON; 
+		} else {
+			std::cout << "[Warning - Spell::configureSpell] Unknown element: " << attr.as_string() << std::endl;
+		}
+	}
 
 	if ((attr = node.attribute("groupcooldown"))) {
 		groupCooldown = pugi::cast<uint32_t>(attr.value());
@@ -415,6 +435,26 @@ bool Spell::configureSpell(const pugi::xml_node& node) {
 			secondaryGroup = SPELLGROUP_SPECIAL;
 		} else {
 			std::cout << "[Warning - Spell::configureSpell] Unknown secondarygroup: " << attr.as_string() << std::endl;
+		}
+	}
+	
+	//LONNE ELEMENTo
+	if ((attr = node.attribute("secondaryelement"))) {
+		std::string tmpStr = boost::algorithm::to_lower_copy<std::string>(attr.as_string());
+		if (tmpStr == "none" || tmpStr == "0") {
+			secondaryElement = ELEMENTGROUP_NONE;
+		} else if (tmpStr == "katon" || tmpStr == "1") {
+			secondaryElement = ELEMENTGROUP_KATON;
+		} else if (tmpStr == "raiton" || tmpStr == "2") {
+			secondaryElement = ELEMENTGROUP_RAITON;
+		} else if (tmpStr == "doton" || tmpStr == "3") {
+			secondaryElement = ELEMENTGROUP_DOTON;
+		} else if (tmpStr == "suiton" || tmpStr == "4") {
+			secondaryElement = ELEMENTGROUP_SUITON;
+		} else if (tmpStr == "fuuton" || tmpStr == "5") {
+			secondaryElement = ELEMENTGROUP_FUUTON;
+		} else {
+			std::cout << "[Warning - Spell::configureSpell] Unknown secondaryelement: " << attr.as_string() << std::endl;
 		}
 	}
 
@@ -504,6 +544,11 @@ bool Spell::configureSpell(const pugi::xml_node& node) {
 	if (group == SPELLGROUP_NONE) {
 		group = (aggressive ? SPELLGROUP_ATTACK : SPELLGROUP_HEALING);
 	}
+	
+	//LONNE ELEMENTO
+	//if (element == ELEMENTOGROUP_NONE) {
+	//	element = (aggressive ? ELEMENTOGROUP_KATON : ELEMENTOGROUP_FUUTON);
+	//}
 
 	for (auto vocationNode : node.children()) {
 		if (!(attr = vocationNode.attribute("name"))) {
@@ -528,6 +573,44 @@ bool Spell::playerSpellCheck(Player* player) const {
 
 	if (player->hasFlag(PlayerFlag_IgnoreSpellCheck)) {
 		return true;
+	}
+	
+	//LONNE ELEMENTO
+	// Verifica se o player tem o elemento necessário
+	if (element == ELEMENTGROUP_KATON) {
+		if (!player->hasElement(ELEMENT_KATON)) {
+			player->sendCancelMessage("Only players of Katon element can use this spell.");
+			g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+			return false;
+		}
+	}
+	if (element == ELEMENTGROUP_RAITON) {
+		if (!player->hasElement(ELEMENT_RAITON)) {
+			player->sendCancelMessage("Only players of Raiton element can use this spell.");
+			g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+			return false;
+		}
+	}
+	if (element == ELEMENTGROUP_DOTON) {
+		if (!player->hasElement(ELEMENT_DOTON)) {
+			player->sendCancelMessage("Only players of Doton element can use this spell.");
+			g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+			return false;
+		}
+	}
+	if (element == ELEMENTGROUP_SUITON) {
+		if (!player->hasElement(ELEMENT_SUITON)) {
+			player->sendCancelMessage("Only players of Suiton element can use this spell.");
+			g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+			return false;
+		}
+	}
+	if (element == ELEMENTGROUP_FUUTON) {
+		if (!player->hasElement(ELEMENT_FUUTON)) {
+			player->sendCancelMessage("Only players of Fuuton element can use this spell.");
+			g_game.addMagicEffect(player->getPosition(), CONST_ME_POFF);
+			return false;
+		}
 	}
 
 	if (!enabled) {

@@ -6,6 +6,8 @@
 #include "player.h"
 
 #include "bed.h"
+#include "element.h" //LONNE ELEMENTO
+#include "spells.h" //LONNE ELEMENTO
 #include "chat.h"
 #include "combat.h"
 #include "configmanager.h"
@@ -27,9 +29,11 @@
 extern Game g_game;
 extern Chat* g_chat;
 extern Vocations g_vocations;
+extern Elements g_elements; //LONNE ELEMENTO
 extern MoveEvents* g_moveEvents;
 extern Weapons* g_weapons;
 extern CreatureEvents* g_creatureEvents;
+extern Spells* g_spells; //LONNE ELEEMNTO
 
 MuteCountMap Player::muteCountMap;
 
@@ -74,6 +78,25 @@ bool Player::setVocation(uint16_t vocId) {
 	g_game.changeSpeed(this, 0);
 
 	return true;
+}
+
+//LONNE ELEMENTO 
+bool Player::setElement(uint16_t elementId)
+{
+	Element* newElement = g_elements.getElement(elementId);
+	if (!newElement) {
+		return false;
+	}
+	element = newElement;
+	return true;
+}
+
+bool Player::hasElement(ElementType_t elementType) const
+{
+	if (element && element->getElementType() == elementType) {
+		return true;
+	}
+	return false;
 }
 
 bool Player::isPushable() const {
@@ -1841,6 +1864,16 @@ BlockType_t Player::blockHit(Creature* attacker, CombatType_t combatType, int32_
 						g_game.transformItem(item, item->getID(), charges - 1);
 					}
 				}
+			}
+		}
+	}
+	
+	//LONNE ELEMENTO 
+	if (Element* targetElement = getPlayerElement()) {
+		if (combatType != COMBAT_NONE && combatType != COMBAT_HEALING) {
+			float defenseFactor = targetElement->getDefenseFactor(combatType);
+			if (defenseFactor != 1.0f) {
+				damage = std::round(damage * defenseFactor);
 			}
 		}
 	}
@@ -3773,11 +3806,61 @@ double Player::getLostPercent() const {
 	return lossPercent * (1 - (percentReduction / 100.)) / 100.;
 }
 
-void Player::learnInstantSpell(const std::string& spellName) {
-	if (!hasLearnedInstantSpell(spellName)) {
-		learnedInstantSpellList.push_front(spellName);
+//void Player::learnInstantSpell(const std::string& spellName) {
+	//if (!hasLearnedInstantSpell(spellName)) {
+	//	learnedInstantSpellList.push_front(spellName);
+	//}
+//} PADRAO LONNE... 
+
+//LONNE ELEMENTO 
+void Player::learnInstantSpell(const std::string& spellName)
+{
+	if (hasLearnedInstantSpell(spellName)) {
+		return;
 	}
+
+	InstantSpell* spell = g_spells->getInstantSpellByName(spellName);
+	if (!spell) {
+		return;
+	}
+
+	SpellElement_t element = spell->getElement();
+
+	// Verifica se o player tem o elemento necessario (pode ser primary ou secondary)
+	if (element == ELEMENTGROUP_KATON) {
+		if (!hasElement(ELEMENT_KATON)) {
+			sendCancelMessage("Only players of Katon element can learn this spell.");
+			return;
+		}
+	}
+	if (element == ELEMENTGROUP_RAITON) {
+		if (!hasElement(ELEMENT_RAITON)) {
+			sendCancelMessage("Only players of Raiton element can learn this spell.");
+			return;
+		}
+	}
+	if (element == ELEMENTGROUP_DOTON) {
+		if (!hasElement(ELEMENT_DOTON)) {
+			sendCancelMessage("Only players of Doton element can learn this spell.");
+			return;
+		}
+	}
+	if (element == ELEMENTGROUP_SUITON) {
+		if (!hasElement(ELEMENT_SUITON)) {
+			sendCancelMessage("Only players of Suiton element can learn this spell.");
+			return;
+		}
+	}
+	if (element == ELEMENTGROUP_FUUTON) {
+		if (!hasElement(ELEMENT_FUUTON)) {
+			sendCancelMessage("Only players of Fuuton element can learn this spell.");
+			return;
+		}
+	}
+
+	learnedInstantSpellList.push_front(spellName);
 }
+//LONNE ELEMENTO /\
 
 void Player::forgetInstantSpell(const std::string& spellName) {
 	learnedInstantSpellList.remove(spellName);

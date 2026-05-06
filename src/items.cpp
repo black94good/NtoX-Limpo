@@ -106,6 +106,14 @@ namespace {
 		{"absorbpercentphysical", ITEM_PARSE_ABSORBPERCENTPHYSICAL},
 		{"absorbpercenthealing", ITEM_PARSE_ABSORBPERCENTHEALING},
 		{"absorbpercentundefined", ITEM_PARSE_ABSORBPERCENTUNDEFINED},
+		
+		//LONNE ELEMENTO
+		{"absorbpercentkaton", ITEM_PARSE_ABSORBPERCENTKATON},
+		{"absorbpercentraiton", ITEM_PARSE_ABSORBPERCENTRAITON},
+		{"absorbpercentdoton", ITEM_PARSE_ABSORBPERCENTDOTON},
+		{"absorbpercentsuiton", ITEM_PARSE_ABSORBPERCENTSUITON},
+		{"absorbpercentfuuton", ITEM_PARSE_ABSORBPERCENTFUUTON},
+		
 		{"suppressdrunk", ITEM_PARSE_SUPPRESSDRUNK},
 		{"suppressenergy", ITEM_PARSE_SUPPRESSENERGY},
 		{"suppressfire", ITEM_PARSE_SUPPRESSFIRE},
@@ -131,6 +139,15 @@ namespace {
 		{"elementenergy", ITEM_PARSE_ELEMENTENERGY},
 		{"elementdeath", ITEM_PARSE_ELEMENTDEATH},
 		{"elementholy", ITEM_PARSE_ELEMENTHOLY},
+		
+		//LONNE ELEMENTO
+		{"elementkaton", ITEM_PARSE_ELEMENTKATON},
+		{"elementraiton", ITEM_PARSE_ELEMENTRAITON},
+		{"elementdoton", ITEM_PARSE_ELEMENTDOTON},
+		{"elementsuiton", ITEM_PARSE_ELEMENTSUITON},
+		{"elementfuuton", ITEM_PARSE_ELEMENTFUUTON},
+
+
 		{"walkstack", ITEM_PARSE_WALKSTACK},
 		{"blocking", ITEM_PARSE_BLOCKING},
 		{"allowdistread", ITEM_PARSE_ALLOWDISTREAD},
@@ -167,6 +184,15 @@ namespace {
 		{"undead", RACE_UNDEAD},
 		{"fire", RACE_FIRE},
 		{"energy", RACE_ENERGY},
+	};
+	
+	//LONNE ELEMENT
+	const std::unordered_map<std::string, ElementType_t> ElementTypesMap = {
+		{"katon", ELEMENT_KATON},
+		{"raiton", ELEMENT_RAITON},
+		{"doton", ELEMENT_DOTON},
+		{"suiton", ELEMENT_SUITON},
+		{"fuuton", ELEMENT_FUUTON},
 	};
 
 	const std::unordered_map<std::string, WeaponType_t> WeaponTypesMap = {
@@ -1064,6 +1090,14 @@ void Items::parseItemNode(const pugi::xml_node& itemNode, uint16_t id) {
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_FIREDAMAGE)] += value;
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_EARTHDAMAGE)] += value;
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_ICEDAMAGE)] += value;
+					
+					//LONNE ELEMENTO 
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_KATONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_RAITONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_DOTONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_SUITONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_FUUTONDAMAGE)] += value;
+					
 					break;
 				}
 
@@ -1075,6 +1109,13 @@ void Items::parseItemNode(const pugi::xml_node& itemNode, uint16_t id) {
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_ICEDAMAGE)] += value;
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_HOLYDAMAGE)] += value;
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_DEATHDAMAGE)] += value;
+					
+					//LONNE ELEMENTO 
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_KATONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_RAITONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_DOTONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_SUITONDAMAGE)] += value;
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_FUUTONDAMAGE)] += value;
 					break;
 				}
 
@@ -1135,6 +1176,33 @@ void Items::parseItemNode(const pugi::xml_node& itemNode, uint16_t id) {
 
 				case ITEM_PARSE_ABSORBPERCENTUNDEFINED: {
 					abilities.absorbPercent[combatTypeToIndex(COMBAT_UNDEFINEDDAMAGE)] += pugi::cast<int16_t>(valueAttribute.value());
+					break;
+				}
+				
+				//LONNE ELEMENTO
+
+				case ITEM_PARSE_ABSORBPERCENTKATON: {
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_KATONDAMAGE)] += pugi::cast<int16_t>(valueAttribute.value());
+					break;
+				}
+				
+				case ITEM_PARSE_ABSORBPERCENTRAITON: {
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_RAITONDAMAGE)] += pugi::cast<int16_t>(valueAttribute.value());
+					break;
+				}
+				
+				case ITEM_PARSE_ABSORBPERCENTDOTON: {
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_DOTONDAMAGE)] += pugi::cast<int16_t>(valueAttribute.value());
+					break;
+				}
+
+				case ITEM_PARSE_ABSORBPERCENTSUITON: {
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_SUITONDAMAGE)] += pugi::cast<int16_t>(valueAttribute.value());
+					break;
+				}
+
+				case ITEM_PARSE_ABSORBPERCENTFUUTON: {
+					abilities.absorbPercent[combatTypeToIndex(COMBAT_FUUTONDAMAGE)] += pugi::cast<int16_t>(valueAttribute.value());
 					break;
 				}
 
@@ -1378,6 +1446,37 @@ void Items::parseItemNode(const pugi::xml_node& itemNode, uint16_t id) {
 				case ITEM_PARSE_ELEMENTHOLY: {
 					abilities.elementDamage = pugi::cast<uint16_t>(valueAttribute.value());
 					abilities.elementType = COMBAT_HOLYDAMAGE;
+					break;
+				}
+				
+				//LONNE ELEMENTO
+				case ITEM_PARSE_ELEMENTKATON: {
+					abilities.elementDamage = pugi::cast<uint16_t>(valueAttribute.value());
+					abilities.elementType = COMBAT_KATONDAMAGE;
+					break;
+				}
+				
+				case ITEM_PARSE_ELEMENTRAITON: {
+					abilities.elementDamage = pugi::cast<uint16_t>(valueAttribute.value());
+					abilities.elementType = COMBAT_RAITONDAMAGE;
+					break;
+				}
+
+				case ITEM_PARSE_ELEMENTDOTON: {
+					abilities.elementDamage = pugi::cast<uint16_t>(valueAttribute.value());
+					abilities.elementType = COMBAT_DOTONDAMAGE;
+					break;
+				}
+				
+				case ITEM_PARSE_ELEMENTSUITON: {
+					abilities.elementDamage = pugi::cast<uint16_t>(valueAttribute.value());
+					abilities.elementType = COMBAT_SUITONDAMAGE;
+					break;
+				}
+
+				case ITEM_PARSE_ELEMENTFUUTON: {
+					abilities.elementDamage = pugi::cast<uint16_t>(valueAttribute.value());
+					abilities.elementType = COMBAT_FUUTONDAMAGE;
 					break;
 				}
 

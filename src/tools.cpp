@@ -442,6 +442,13 @@ CombatTypeNames combatTypeNames = {
 	{COMBAT_ICEDAMAGE, 		"ice"},
 	{COMBAT_HOLYDAMAGE, 		"holy"},
 	{COMBAT_DEATHDAMAGE, 		"death"},
+	
+	//LONNE ELEMENTO
+	{COMBAT_KATONDAMAGE, 		"katon"},
+	{COMBAT_RAITONDAMAGE, 		"raiton"},
+	{COMBAT_DOTONDAMAGE, 		"doton"},
+	{COMBAT_SUITONDAMAGE, 		"suiton"},
+	{COMBAT_FUUTONDAMAGE, 		"fuuton"},
 };
 
 AmmoTypeNames ammoTypeNames = {
@@ -691,6 +698,19 @@ size_t combatTypeToIndex(CombatType_t combatType) {
 			return 10;
 		case COMBAT_DEATHDAMAGE:
 			return 11;
+		
+		//LONNE ELEMENTO
+		case COMBAT_KATONDAMAGE:
+			return 12;
+		case COMBAT_RAITONDAMAGE:
+			return 13;
+		case COMBAT_DOTONDAMAGE:
+			return 14;
+		case COMBAT_SUITONDAMAGE:
+			return 15;
+		case COMBAT_FUUTONDAMAGE:
+			return 16;
+
 		default:
 			return 0;
 	}
@@ -1015,6 +1035,24 @@ SpellGroup_t stringToSpellGroup(const std::string& value) {
 	}
 
 	return SPELLGROUP_NONE;
+}
+
+//LONNE ELEMENTO
+SpellElement_t stringToSpellElement(const std::string& value) {
+	std::string tmpStr = boost::algorithm::to_lower_copy(value);
+	if (tmpStr == "katon" || tmpStr == "1") {
+		return ELEMENTGROUP_KATON;
+	} else if (tmpStr == "raiton" || tmpStr == "2") {
+		return ELEMENTGROUP_RAITON;
+	} else if (tmpStr == "doton" || tmpStr == "3") {
+		return ELEMENTGROUP_DOTON;
+	} else if (tmpStr == "suiton" || tmpStr == "4") {
+		return ELEMENTGROUP_SUITON;
+	} else if (tmpStr == "fuuton" || tmpStr == "5") {
+		return ELEMENTGROUP_FUUTON;
+	}
+
+	return ELEMENTGROUP_NONE;
 }
 
 const std::vector<Direction>& getShuffleDirections() {

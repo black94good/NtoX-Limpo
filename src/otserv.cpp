@@ -15,6 +15,7 @@
 #include "protocollogin.h"
 #include "protocolold.h"
 #include "protocolstatus.h"
+#include "element.h" //LONNE ELEMENTO
 #include "rsa.h"
 #include "scheduler.h"
 #include "script.h"
@@ -34,6 +35,7 @@ Scheduler g_scheduler;
 Game g_game;
 Monsters g_monsters;
 Vocations g_vocations;
+Elements g_elements; //LONNE ELEMENTO
 extern Scripts* g_scripts;
 
 std::mutex g_loaderLock;
@@ -136,6 +138,14 @@ namespace {
 		std::cout << ">> Loading vocations" << std::endl;
 		if (!g_vocations.loadFromXml()) {
 			startupErrorMessage("Unable to load vocations!");
+			return;
+		}
+		
+		//LONNE ELEMENTO 
+		// load elements
+		std::cout << ">> Loading elements" << std::endl;
+		if (!g_elements.loadFromXml()) {
+			startupErrorMessage("Unable to load elements!");
 			return;
 		}
 

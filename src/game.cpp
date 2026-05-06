@@ -38,6 +38,7 @@ extern Chat* g_chat;
 extern TalkActions* g_talkActions;
 extern Spells* g_spells;
 extern Vocations g_vocations;
+extern Elements g_elements; //LONNE ELEMENTO
 extern GlobalEvents* g_globalEvents;
 extern CreatureEvents* g_creatureEvents;
 extern Monsters g_monsters;
@@ -3787,7 +3788,14 @@ bool Game::combatBlockHit(CombatDamage& damage, Creature* attacker, Creature* ta
 				case COMBAT_FIREDAMAGE:
 				case COMBAT_PHYSICALDAMAGE:
 				case COMBAT_ICEDAMAGE:
-				case COMBAT_DEATHDAMAGE: {
+				case COMBAT_DEATHDAMAGE: 
+				//LONNE ELEMENTO
+				case COMBAT_KATONDAMAGE:
+				case COMBAT_SUITONDAMAGE:
+				case COMBAT_DOTONDAMAGE:
+				case COMBAT_RAITONDAMAGE:
+				case COMBAT_FUUTONDAMAGE:
+				{
 					hitEffect = CONST_ME_BLOCKHIT;
 					break;
 				}
@@ -3919,6 +3927,36 @@ void Game::combatGetTypeInfo(CombatType_t combatType, Creature* target, TextColo
 			effect = CONST_ME_SMALLCLOUDS;
 			break;
 		}
+		
+		//LONNE ELEMENTO
+		case COMBAT_KATONDAMAGE: {
+			color = TEXTCOLOR_ELECTRICPURPLE;
+			effect = CONST_ME_ENERGYHIT;
+			break;
+		}
+
+		case COMBAT_RAITONDAMAGE: {
+			color = TEXTCOLOR_LIGHTGREEN;
+			effect = CONST_ME_GREEN_RINGS;
+			break;
+		}
+
+		case COMBAT_DOTONDAMAGE: {
+			color = TEXTCOLOR_LIGHTBLUE;
+			effect = CONST_ME_LOSEENERGY;
+			break;
+		}
+		case COMBAT_SUITONDAMAGE: {
+			color = TEXTCOLOR_ORANGE;
+			effect = CONST_ME_HITBYFIRE;
+			break;
+		}
+		case COMBAT_FUUTONDAMAGE: {
+			color = TEXTCOLOR_SKYBLUE;
+			effect = CONST_ME_ICEATTACK;
+			break;
+		}
+		
 		case COMBAT_LIFEDRAIN: {
 			color = TEXTCOLOR_RED;
 			effect = CONST_ME_MAGIC_RED;

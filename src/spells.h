@@ -208,6 +208,21 @@ class Spell : public BaseSpell {
 		void setSecondaryGroup(SpellGroup_t g) {
 			secondaryGroup = g;
 		}
+		
+		//LONNE ELEMENTO
+		SpellElement_t getElement() const {
+			return element;
+		}
+		void setElement(SpellElement_t e) {
+			element = e;
+		}
+		SpellElement_t getSecondaryElement() const {
+			return secondaryElement;
+		}
+		void setSecondaryElement(SpellElement_t e) {
+			secondaryElement = e;
+		}
+		
 
 		uint32_t getCooldown() const {
 			return cooldown;
@@ -295,6 +310,10 @@ class Spell : public BaseSpell {
 
 		SpellGroup_t group = SPELLGROUP_NONE;
 		SpellGroup_t secondaryGroup = SPELLGROUP_NONE;
+		
+		//LONNE ELEMENTO
+		SpellElement_t element = ELEMENTGROUP_NONE;
+		SpellElement_t secondaryElement = ELEMENTGROUP_NONE;
 
 		uint32_t cooldown = 1000;
 		uint32_t groupCooldown = 1000;

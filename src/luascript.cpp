@@ -1257,7 +1257,15 @@ void LuaScriptInterface::registerFunctions() {
 	registerEnum(L, COMBAT_ICEDAMAGE)
 	registerEnum(L, COMBAT_HOLYDAMAGE)
 	registerEnum(L, COMBAT_DEATHDAMAGE)
-
+	
+	//LONNE ELEMENTO 
+	// register new combats
+	registerEnum(L, COMBAT_KATONDAMAGE)
+	registerEnum(L, COMBAT_RAITONDAMAGE)
+	registerEnum(L, COMBAT_DOTONDAMAGE)
+	registerEnum(L, COMBAT_SUITONDAMAGE)
+	registerEnum(L, COMBAT_FUUTONDAMAGE)
+	
 	registerEnum(L, COMBAT_PARAM_TYPE)
 	registerEnum(L, COMBAT_PARAM_EFFECT)
 	registerEnum(L, COMBAT_PARAM_DISTANCEEFFECT)
@@ -2589,6 +2597,12 @@ void LuaScriptInterface::registerFunctions() {
 
 	registerMethod(L, "Player", "getSex", LuaScriptInterface::luaPlayerGetSex);
 	registerMethod(L, "Player", "setSex", LuaScriptInterface::luaPlayerSetSex);
+	
+	//LONNE ELEMENTO 
+	registerMethod(L, "Player", "getElement", LuaScriptInterface::luaPlayerGetElement);
+	registerMethod(L, "Player", "setElement", LuaScriptInterface::luaPlayerSetElement);
+	registerMethod(L, "Player", "getElementId", LuaScriptInterface::luaPlayerGetElementId);
+	registerMethod(L, "Player", "hasElement", LuaScriptInterface::luaPlayerHasElement);
 
 	registerMethod(L, "Player", "getTown", LuaScriptInterface::luaPlayerGetTown);
 	registerMethod(L, "Player", "setTown", LuaScriptInterface::luaPlayerSetTown);
@@ -3151,6 +3165,7 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Spell", "name", LuaScriptInterface::luaSpellName);
 	registerMethod(L, "Spell", "id", LuaScriptInterface::luaSpellId);
 	registerMethod(L, "Spell", "group", LuaScriptInterface::luaSpellGroup);
+	registerMethod(L, "Spell", "element", LuaScriptInterface::luaSpellElement); //LONNE ELEEMNTO
 	registerMethod(L, "Spell", "cooldown", LuaScriptInterface::luaSpellCooldown);
 	registerMethod(L, "Spell", "groupCooldown", LuaScriptInterface::luaSpellGroupCooldown);
 	registerMethod(L, "Spell", "level", LuaScriptInterface::luaSpellLevel);
@@ -9026,6 +9041,55 @@ int LuaScriptInterface::luaPlayerSetSex(lua_State* L) {
 	}
 	return 1;
 }
+
+//LONNE ELEMENTO
+int LuaScriptInterface::luaPlayerGetElement(lua_State* L)
+{
+	Player* player = lua::getUserdata<Player>(L, 1);
+	if (player) {
+		lua_pushnumber(L, player->getElementId());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerSetElement(lua_State* L)
+{
+	Player* player = lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	uint16_t elementId = lua::getNumber<uint16_t>(L, 2);
+	lua::pushBoolean(L, player->setElement(elementId));
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerGetElementId(lua_State* L)
+{
+	Player* player = lua::getUserdata<Player>(L, 1);
+	if (player) {
+		lua_pushnumber(L, player->getElementId());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+int LuaScriptInterface::luaPlayerHasElement(lua_State* L)
+{
+	Player* player = lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	ElementType_t elementType = static_cast<ElementType_t>(lua::getNumber<int32_t>(L, 2));
+	lua::pushBoolean(L, player->hasElement(elementType));
+	return 1;
+}
+//LONNE ELEMENTO /\
 
 int LuaScriptInterface::luaPlayerGetTown(lua_State* L) {
 	// player:getTown()
@@ -15148,6 +15212,73 @@ int LuaScriptInterface::luaSpellGroup(lua_State* L) {
 	return 1;
 }
 
+//LONNE ELEMENTO
+int LuaScriptInterface::luaSpellElement(lua_State* L) {
+	// spell:element(primaryElement[, secondaryElement])
+	Spell* spell = lua::getUserdata<Spell>(L, 1);
+	if (spell) {
+		if (lua_gettop(L) == 1) {
+			lua_pushnumber(L, spell->getElement());
+			lua_pushnumber(L, spell->getSecondaryElement());
+			return 2;
+		} else if (lua_gettop(L) == 2) {
+			SpellElement_t element = lua::getNumber<SpellElement_t>(L, 2);
+			if (element) {
+				spell->setElement(element);
+				lua::pushBoolean(L, true);
+			} else if (lua_isstring(L, 2)) {
+				element = stringToSpellElement(lua::getString(L, 2));
+				if (element != ELEMENTGROUP_NONE) {
+					spell->setElement(element);
+				} else {
+					std::cout << "[Warning - Spell::element] Unknown element: " << lua::getString(L, 2) << std::endl;
+					lua::pushBoolean(L, false);
+					return 1;
+				}
+				lua::pushBoolean(L, true);
+			} else {
+				std::cout << "[Warning - Spell::element] Unknown element: " << lua::getString(L, 2) << std::endl;
+				lua::pushBoolean(L, false);
+				return 1;
+			}
+		} else {
+			SpellElement_t primaryElement = lua::getNumber<SpellElement_t>(L, 2);
+			SpellElement_t secondaryElement = lua::getNumber<SpellElement_t>(L, 3);
+			if (primaryElement && secondaryElement) {
+				spell->setElement(primaryElement);
+				spell->setSecondaryElement(secondaryElement);
+				lua::pushBoolean(L, true);
+			} else if (lua_isstring(L, 2) && lua_isstring(L, 3)) {
+				primaryElement = stringToSpellElement(lua::getString(L, 2));
+				if (primaryElement != ELEMENTGROUP_NONE) {
+					spell->setElement(primaryElement);
+				} else {
+					std::cout << "[Warning - Spell::element] Unknown primaryElement: " << lua::getString(L, 2) << std::endl;
+					lua::pushBoolean(L, false);
+					return 1;
+				}
+				secondaryElement = stringToSpellElement(lua::getString(L, 3));
+				if (secondaryElement != ELEMENTGROUP_NONE) {
+					spell->setSecondaryElement(secondaryElement);
+				} else {
+					std::cout << "[Warning - Spell::element] Unknown secondaryElement: " << lua::getString(L, 3) << std::endl;
+					lua::pushBoolean(L, false);
+					return 1;
+				}
+				lua::pushBoolean(L, true);
+			} else {
+				std::cout << "[Warning - Spell::element] Unknown primaryElement: " << lua::getString(L, 2) << " or secondaryElement: " << lua::getString(L, 3) << std::endl;
+				lua::pushBoolean(L, false);
+				return 1;
+			}
+		}
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+//LONNE ELEMENTO /\
+
 int LuaScriptInterface::luaSpellCooldown(lua_State* L) {
 	// spell:cooldown(cooldown)
 	Spell* spell = lua::getUserdata<Spell>(L, 1);
@@ -16810,6 +16941,19 @@ int LuaScriptInterface::luaWeaponElement(lua_State* L) {
 				weapon->params.combatType = COMBAT_DEATHDAMAGE;
 			} else if (tmpStrValue == "holy") {
 				weapon->params.combatType = COMBAT_HOLYDAMAGE;
+				
+			//LONNE ELEMENTO 
+			} else if (tmpStrValue == "katon") {
+				weapon->params.combatType = COMBAT_KATONDAMAGE;
+			} else if (tmpStrValue == "raiton") {
+				weapon->params.combatType = COMBAT_RAITONDAMAGE;
+			} else if (tmpStrValue == "doton") {
+				weapon->params.combatType = COMBAT_DOTONDAMAGE;
+			} else if (tmpStrValue == "suiton") {
+				weapon->params.combatType = COMBAT_SUITONDAMAGE;
+			} else if (tmpStrValue == "fuuton") {
+				weapon->params.combatType = COMBAT_FUUTONDAMAGE;
+				
 			} else {
 				std::cout << "[Warning - weapon:element] Type \"" << element << "\" does not exist." << std::endl;
 			}
@@ -17062,6 +17206,18 @@ int LuaScriptInterface::luaWeaponExtraElement(lua_State* L) {
 				it.abilities.get()->elementType = COMBAT_DEATHDAMAGE;
 			} else if (tmpStrValue == "holy") {
 				it.abilities.get()->elementType = COMBAT_HOLYDAMAGE;
+				
+			//LONNE ELEMENTO
+			} else if (tmpStrValue == "katon") {
+				it.abilities.get()->elementType = COMBAT_KATONDAMAGE;
+			} else if (tmpStrValue == "raiton") {
+				it.abilities.get()->elementType = COMBAT_RAITONDAMAGE;
+			} else if (tmpStrValue == "doton") {
+				it.abilities.get()->elementType = COMBAT_DOTONDAMAGE;
+			} else if (tmpStrValue == "suiton") {
+				it.abilities.get()->elementType = COMBAT_SUITONDAMAGE;
+			} else if (tmpStrValue == "fuuton") {
+				it.abilities.get()->elementType = COMBAT_FUUTONDAMAGE;
 			} else {
 				std::cout << "[Warning - weapon:extraElement] Type \"" << element << "\" does not exist." << std::endl;
 			}

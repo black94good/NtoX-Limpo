@@ -141,6 +141,16 @@ enum SpellGroup_t : uint8_t {
 	SPELLGROUP_SPECIAL = 4,
 };
 
+//LONNE ELEMENTO
+enum SpellElement_t : uint8_t {
+	ELEMENTGROUP_NONE = 0,
+	ELEMENTGROUP_KATON = 1,
+	ELEMENTGROUP_RAITON = 2,
+	ELEMENTGROUP_DOTON	= 3,
+	ELEMENTGROUP_SUITON = 4,
+	ELEMENTGROUP_FUUTON = 5,
+};
+
 enum SpellType_t : uint8_t {
 	SPELL_UNDEFINED = 0,
 	SPELL_INSTANT = 1,
@@ -165,7 +175,17 @@ enum RaceType_t : uint8_t {
 	RACE_ENERGY,
 };
 
-enum CombatType_t : uint16_t {
+//LONNE ELEMENTO
+enum ElementType_t : uint8_t {
+	ELEMENT_NONE,
+	ELEMENT_KATON,
+	ELEMENT_RAITON,
+	ELEMENT_DOTON,
+	ELEMENT_SUITON,
+	ELEMENT_FUUTON,
+};
+
+enum CombatType_t : uint32_t {
 	COMBAT_NONE = 0,
 
 	COMBAT_PHYSICALDAMAGE = 1 << 0,
@@ -180,8 +200,16 @@ enum CombatType_t : uint16_t {
 	COMBAT_ICEDAMAGE = 1 << 9,
 	COMBAT_HOLYDAMAGE = 1 << 10,
 	COMBAT_DEATHDAMAGE = 1 << 11,
+	
+	//LONNE ELEMENTO
+	COMBAT_KATONDAMAGE    		= 1 << 12,
+	COMBAT_RAITONDAMAGE    		= 1 << 13,
+	COMBAT_DOTONDAMAGE    		= 1 << 14,
+	COMBAT_SUITONDAMAGE   		= 1 << 15,
+	COMBAT_FUUTONDAMAGE    		= 1 << 16,
 
-	COMBAT_COUNT = 12
+
+	COMBAT_COUNT = 17
 };
 
 enum CombatParam_t {

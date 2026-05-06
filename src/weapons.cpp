@@ -861,6 +861,19 @@ bool WeaponWand::configureEvent(const pugi::xml_node& node) {
 		params.combatType = COMBAT_DEATHDAMAGE;
 	} else if (tmpStrValue == "holy") {
 		params.combatType = COMBAT_HOLYDAMAGE;
+	
+	//LONNE ELEMENTO
+	} else if (tmpStrValue == "katon") {
+		params.combatType = COMBAT_KATONDAMAGE;
+	} else if (tmpStrValue == "raiton") {
+		params.combatType = COMBAT_RAITONDAMAGE;
+	} else if (tmpStrValue == "doton") {
+		params.combatType = COMBAT_DOTONDAMAGE;
+	} else if (tmpStrValue == "suiton") {
+		params.combatType = COMBAT_SUITONDAMAGE;
+	} else if (tmpStrValue == "fuuton") {
+		params.combatType = COMBAT_FUUTONDAMAGE;
+
 	} else {
 		std::cout << "[Warning - WeaponWand::configureEvent] Type \"" << attr.as_string() << "\" does not exist." << std::endl;
 	}

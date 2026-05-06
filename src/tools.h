@@ -72,6 +72,9 @@ int64_t OTSYS_TIME();
 
 SpellGroup_t stringToSpellGroup(const std::string& value);
 
+//LOONE ELEMENTO
+SpellElement_t stringToSpellElement(const std::string& value);
+
 const std::vector<Direction>& getShuffleDirections();
 
 #endif // FS_TOOLS_H

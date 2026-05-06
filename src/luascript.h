@@ -688,6 +688,12 @@ class LuaScriptInterface {
 
 		static int luaPlayerGetSex(lua_State* L);
 		static int luaPlayerSetSex(lua_State* L);
+		
+		//LONNE ELEMENTO
+		static int luaPlayerGetElement(lua_State* L);
+		static int luaPlayerSetElement(lua_State* L);
+		static int luaPlayerGetElementId(lua_State* L);
+		static int luaPlayerHasElement(lua_State* L);
 
 		static int luaPlayerGetTown(lua_State* L);
 		static int luaPlayerSetTown(lua_State* L);
@@ -1225,6 +1231,7 @@ class LuaScriptInterface {
 		static int luaSpellName(lua_State* L);
 		static int luaSpellId(lua_State* L);
 		static int luaSpellGroup(lua_State* L);
+		static int luaSpellElement(lua_State* L); //LONNE ELEMENTO
 		static int luaSpellCooldown(lua_State* L);
 		static int luaSpellGroupCooldown(lua_State* L);
 		static int luaSpellLevel(lua_State* L);

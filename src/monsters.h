@@ -150,6 +150,8 @@ class MonsterType {
 		bool canWalkOnPoison = true;
 
 		MonstersEvent_t eventType = MONSTERS_EVENT_NONE;
+		//LONNE ELEMENTO
+		ElementType_t element = ELEMENT_NONE;
 	};
 
 	public:

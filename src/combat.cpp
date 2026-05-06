@@ -789,12 +789,23 @@ void Combat::doTargetCombat(Creature* caster, Creature* target, CombatDamage& da
 					damage.critical = true;
 				}
 			}
+			
+			//LONNE ELEMENTO
+			if (Element* casterElement = casterPlayer->getPlayerElement()) {
+				if (damage.primary.type != COMBAT_NONE && damage.primary.type != COMBAT_HEALING) {
+					float attackFactor = casterElement->getAttackFactor(damage.primary.type);
+					if (attackFactor != 1.0f) {
+						damage.primary.value = std::round(damage.primary.value * attackFactor);
+					}
+				}
+			}
 		}
 
 		success = g_game.combatChangeHealth(caster, target, damage);
 	} else {
 		success = g_game.combatChangeMana(caster, target, damage);
 	}
+	
 
 	if (success) {
 		if (damage.blockType == BLOCK_NONE || damage.blockType == BLOCK_ARMOR) {

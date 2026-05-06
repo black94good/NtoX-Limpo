@@ -313,6 +313,19 @@ bool Monsters::deserializeSpell(const pugi::xml_node& node, spellBlock_t& sb, co
 			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_HOLYDAMAGE);
 		} else if (tmpName == "death") {
 			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_DEATHDAMAGE);
+			
+		//LONNE ELEMENTO
+		} else if (tmpName == "katon") {
+			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_KATONDAMAGE);
+		} else if (tmpName == "raiton") {
+			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_RAITONDAMAGE);
+		} else if (tmpName == "doton") {
+			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_DOTONDAMAGE);
+		} else if (tmpName == "suiton") {
+			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_SUITONDAMAGE);
+		} else if (tmpName == "fuuton") {	
+			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_FUUTONDAMAGE);
+			
 		} else if (tmpName == "lifedrain") {
 			combat->setParam(COMBAT_PARAM_TYPE, COMBAT_LIFEDRAIN);
 		} else if (tmpName == "manadrain") {
@@ -830,6 +843,24 @@ MonsterType* Monsters::loadMonster(const std::string& file, const std::string& m
 			std::cout << "[Warning - Monsters::loadMonster] Unknown race type " << attr.as_string() << ". " << file << std::endl;
 		}
 	}
+	
+	if ((attr = monsterNode.attribute("element"))) {
+		std::string tmpStrValue = boost::algorithm::to_lower_copy<std::string>(attr.as_string());
+		uint16_t tmpInt = pugi::cast<uint16_t>(attr.value());
+		if (tmpStrValue == "katon" || tmpInt == 1) {
+			mType->info.element = ELEMENT_KATON;
+		} else if (tmpStrValue == "raiton" || tmpInt == 2) {
+			mType->info.element = ELEMENT_RAITON;
+		} else if (tmpStrValue == "doton" || tmpInt == 3) {
+			mType->info.element = ELEMENT_DOTON;
+		} else if (tmpStrValue == "suiton" || tmpInt == 4) {
+			mType->info.element = ELEMENT_SUITON;
+		} else if (tmpStrValue == "fuuton" || tmpInt == 5) {
+			mType->info.element = ELEMENT_FUUTON;
+		} else {
+			std::cout << "[Warning - Monsters::loadMonster] Unknown element type " << attr.as_string() << ". " << file << std::endl;
+		}
+	}
 
 	if ((attr = monsterNode.attribute("experience"))) {
 		mType->info.experience = pugi::cast<uint64_t>(attr.value());
@@ -1073,6 +1104,19 @@ MonsterType* Monsters::loadMonster(const std::string& file, const std::string& m
 				} else if (tmpStrValue == "death") {
 					mType->info.damageImmunities |= COMBAT_DEATHDAMAGE;
 					mType->info.conditionImmunities |= CONDITION_CURSED;
+					
+				//LONNE ELEMENTO
+				} else if (tmpStrValue == "katon") {
+					mType->info.damageImmunities |= COMBAT_KATONDAMAGE;
+				} else if (tmpStrValue == "raiton") {
+					mType->info.damageImmunities |= COMBAT_RAITONDAMAGE;
+				} else if (tmpStrValue == "doton") {
+					mType->info.damageImmunities |= COMBAT_DOTONDAMAGE;
+				} else if (tmpStrValue == "suiton") {
+					mType->info.damageImmunities |= COMBAT_SUITONDAMAGE;
+				} else if (tmpStrValue == "fuuton") {
+					mType->info.damageImmunities |= COMBAT_FUUTONDAMAGE;
+					
 				} else if (tmpStrValue == "lifedrain") {
 					mType->info.damageImmunities |= COMBAT_LIFEDRAIN;
 				} else if (tmpStrValue == "manadrain") {
@@ -1130,6 +1174,30 @@ MonsterType* Monsters::loadMonster(const std::string& file, const std::string& m
 					mType->info.damageImmunities |= COMBAT_DEATHDAMAGE;
 					mType->info.conditionImmunities |= CONDITION_CURSED;
 				}
+				
+			
+			//LONNE ELEMENTO 
+			} else if ((attr = immunityNode.attribute("katon"))) {
+				if (attr.as_bool()) {
+					mType->info.damageImmunities |= COMBAT_KATONDAMAGE;
+				}
+			} else if ((attr = immunityNode.attribute("raiton"))) {
+				if (attr.as_bool()) {
+					mType->info.damageImmunities |= COMBAT_RAITONDAMAGE;
+				}
+			} else if ((attr = immunityNode.attribute("doton"))) {
+				if (attr.as_bool()) {
+					mType->info.damageImmunities |= COMBAT_DOTONDAMAGE;
+				}
+			} else if ((attr = immunityNode.attribute("suiton"))) {
+				if (attr.as_bool()) {
+					mType->info.damageImmunities |= COMBAT_SUITONDAMAGE;
+				}
+			} else if ((attr = immunityNode.attribute("fuuton"))) {
+				if (attr.as_bool()) {
+					mType->info.damageImmunities |= COMBAT_FUUTONDAMAGE;
+				}
+					
 			} else if ((attr = immunityNode.attribute("lifedrain"))) {
 				if (attr.as_bool()) {
 					mType->info.damageImmunities |= COMBAT_LIFEDRAIN;
@@ -1247,6 +1315,35 @@ MonsterType* Monsters::loadMonster(const std::string& file, const std::string& m
 				if (mType->info.damageImmunities & COMBAT_DEATHDAMAGE) {
 					std::cout << "[Warning - Monsters::loadMonster] Same element \"death\" on immunity and element tags. " << file << std::endl;
 				}
+				
+			//LONNE ELEMENTO
+			} else if ((attr = elementNode.attribute("katonPercent"))) {
+				mType->info.elementMap[COMBAT_KATONDAMAGE] = pugi::cast<int32_t>(attr.value());
+				if (mType->info.damageImmunities & COMBAT_KATONDAMAGE) {
+					std::cout << "[Warning - Monsters::loadMonster] Same element \"katon\" on immunity and element tags. " << file << std::endl;
+				}
+			} else if ((attr = elementNode.attribute("raitonPercent"))) {
+				mType->info.elementMap[COMBAT_RAITONDAMAGE] = pugi::cast<int32_t>(attr.value());
+				if (mType->info.damageImmunities & COMBAT_RAITONDAMAGE) {
+					std::cout << "[Warning - Monsters::loadMonster] Same element \"raiton\" on immunity and element tags. " << file << std::endl;
+				}
+			} else if ((attr = elementNode.attribute("dotonPercent"))) {
+				mType->info.elementMap[COMBAT_DOTONDAMAGE] = pugi::cast<int32_t>(attr.value());
+				if (mType->info.damageImmunities & COMBAT_DOTONDAMAGE) {
+					std::cout << "[Warning - Monsters::loadMonster] Same element \"doton\" on immunity and element tags. " << file << std::endl;
+				}
+			} else if ((attr = elementNode.attribute("suitonPercent"))) {
+				mType->info.elementMap[COMBAT_SUITONDAMAGE] = pugi::cast<int32_t>(attr.value());
+				if (mType->info.damageImmunities & COMBAT_SUITONDAMAGE) {
+					std::cout << "[Warning - Monsters::loadMonster] Same element \"suiton\" on immunity and element tags. " << file << std::endl;
+				}
+			} else if ((attr = elementNode.attribute("fuutonPercent"))) {
+				mType->info.elementMap[COMBAT_FUUTONDAMAGE] = pugi::cast<int32_t>(attr.value());
+				if (mType->info.damageImmunities & COMBAT_FUUTONDAMAGE) {
+					std::cout << "[Warning - Monsters::loadMonster] Same element \"fuuton\" on immunity and element tags. " << file << std::endl;
+				}
+
+
 			} else if ((attr = elementNode.attribute("drownPercent"))) {
 				mType->info.elementMap[COMBAT_DROWNDAMAGE] = pugi::cast<int32_t>(attr.value());
 				if (mType->info.damageImmunities & COMBAT_DROWNDAMAGE) {

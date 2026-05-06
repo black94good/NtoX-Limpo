@@ -12,6 +12,7 @@
 #include "guild.h"
 #include "inbox.h"
 #include "protocolgame.h"
+#include "element.h" //LONNE ELEMENTO
 #include "town.h"
 #include "vocation.h"
 
@@ -232,6 +233,12 @@ class Player final : public Creature {
 		Vocation* getVocation() const {
 			return vocation;
 		}
+		
+		//LONNE ELEMENTO 
+		bool setElement(uint16_t elementId);
+		Element* getPlayerElement() const { return element; }
+		uint16_t getElementId() const { return element ? element->getId() : 0; }
+		bool hasElement(ElementType_t elementType) const;
 
 		OperatingSystem_t getOperatingSystem() const {
 			return operatingSystem;
@@ -1265,6 +1272,9 @@ class Player final : public Creature {
 		Town* town = nullptr;
 		Vocation* vocation = nullptr;
 		StoreInbox* storeInbox = nullptr;
+		
+		//LONNE ELEMENTO 
+		Element* element = nullptr;
 
 		Inbox_ptr inbox = nullptr;
 		std::map<uint32_t, DepotChest_ptr> depotChests;
