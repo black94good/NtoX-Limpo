@@ -1574,6 +1574,15 @@ void Player::removeManaSpent(uint64_t amount, bool notify/* = false*/) {
 }
 
 void Player::addExperience(Creature* source, uint64_t exp, bool sendText/* = false*/) {
+	//LONNE LEVEL
+	const uint32_t maxLevel = static_cast<uint32_t>(getNumber(ConfigManager::MAX_LEVEL));
+	if (maxLevel > 0 && level >= maxLevel) {
+		levelPercent = 0;
+		sendStats();
+		return;
+	}
+	// /\
+	
 	uint64_t currLevelExp = Player::getExpForLevel(level);
 	uint64_t nextLevelExp = Player::getExpForLevel(level + 1);
 	uint64_t rawExp = exp;
@@ -1614,7 +1623,7 @@ void Player::addExperience(Creature* source, uint64_t exp, bool sendText/* = fal
 	}
 
 	uint32_t prevLevel = level;
-	while (experience >= nextLevelExp) {
+	while (experience >= nextLevelExp && (maxLevel == 0 || level < maxLevel)) {
 		++level;
 		healthMax += vocation->getHPGain();
 		health += vocation->getHPGain();
@@ -1628,6 +1637,11 @@ void Player::addExperience(Creature* source, uint64_t exp, bool sendText/* = fal
 			//player has reached max level
 			break;
 		}
+	}
+	//LONNE LEVEL
+	if (maxLevel > 0 && level >= maxLevel) {
+		experience = Player::getExpForLevel(maxLevel);
+		levelPercent = 0;
 	}
 
 	if (prevLevel != level) {

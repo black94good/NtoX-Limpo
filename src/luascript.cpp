@@ -2132,6 +2132,7 @@ void LuaScriptInterface::registerFunctions() {
 	registerEnumIn(L, "configKeys", ConfigManager::RATE_LOOT)
 	registerEnumIn(L, "configKeys", ConfigManager::RATE_MAGIC)
 	registerEnumIn(L, "configKeys", ConfigManager::RATE_SPAWN)
+	registerEnumIn(L, "configKeys", ConfigManager::MAX_LEVEL) //LONNE LEVEL
 	registerEnumIn(L, "configKeys", ConfigManager::HOUSE_PRICE)
 	registerEnumIn(L, "configKeys", ConfigManager::KILLS_TO_RED)
 	registerEnumIn(L, "configKeys", ConfigManager::KILLS_TO_BLACK)

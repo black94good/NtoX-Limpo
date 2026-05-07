@@ -85,6 +85,7 @@ namespace ConfigManager {
 		RATE_LOOT,
 		RATE_MAGIC,
 		RATE_SPAWN,
+		MAX_LEVEL, //LONNE LEVEL
 		HOUSE_PRICE,
 		KILLS_TO_RED,
 		KILLS_TO_BLACK,

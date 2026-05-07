@@ -1,84 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <elements>
-	<!-- 
-		RACE SYSTEM - ELEMENT MODIFIERS
-		
-		defense: Fator de defesa contra o elemento (menor = mais resistente)
-		  - 0.7 = 30% menos dano recebido (forte contra)
-		  - 1.0 = dano normal
-		  - 1.3 = 30% mais dano recebido (fraco contra)
-		
-		attack: Fator de ataque com o elemento (maior = mais dano)
-		  - 0.7 = 30% menos dano causado
-		  - 1.0 = dano normal
-		  - 1.3 = 30% mais dano causado
-	-->
-	
-	<!-- NONE - Sem raça (neutro) -->
+
 	<element id="0" name="None" elementtype="none" description="No elemental affinity" />
 
+	<!-- 🔥 KATON -->
 	<element id="1" name="Katon" element="katon" description="Fire Release">
-		<!-- Katon vs Katon -->
-		<element type="katon" defense="1.0" attack="1.0" />
-		<!-- Forte contra Fuuton -->
-		<element type="fuuton" defense="0.85" attack="1.25" />
-		<!-- Fraco contra Suiton -->
-		<element type="suiton" defense="1.0" attack="1.0" />
-		<!-- Neutro contra Raiton -->
+		<element type="katon" defense="0.9" attack="1.1" />
+		<element type="fuuton" defense="0.8" attack="1.2" /> <!-- forte -->
+		<element type="suiton" defense="1.2" attack="0.8" /> <!-- fraco -->
 		<element type="raiton" defense="1.0" attack="1.0" />
-		<!-- Neutro contra Doton -->
 		<element type="doton" defense="1.0" attack="1.0" />
 	</element>
-	
+
+	<!-- ⚡ RAITON -->
 	<element id="2" name="Raiton" element="raiton" description="Lightning Release">
-		<!-- Raiton vs Raiton -->
-		<element type="raiton" defense="0.9" attack="1.2" />
-		<!-- Forte contra Doton -->
-		<element type="doton" defense="0.8" attack="1.3" />
-		<!-- Fraco contra Fuuton -->
-		<element type="fuuton" defense="1.3" attack="0.75" />
-		<!-- Neutro contra Katon -->
+		<element type="raiton" defense="0.9" attack="1.1" />
+		<element type="doton" defense="0.8" attack="1.2" /> <!-- forte -->
+		<element type="fuuton" defense="1.2" attack="0.8" /> <!-- fraco -->
 		<element type="katon" defense="1.0" attack="1.0" />
-		<!-- Neutro contra Suiton -->
 		<element type="suiton" defense="1.0" attack="1.0" />
 	</element>
 
+	<!-- 🪨 DOTON -->
 	<element id="3" name="Doton" element="doton" description="Earth Release">
-		<!-- Doton vs Doton -->
-		<element type="doton" defense="0.85" attack="1.15" />
-		<!-- Forte contra Suiton -->
-		<element type="suiton" defense="0.85" attack="1.25" />
-		<!-- Fraco contra Raiton -->
-		<element type="raiton" defense="1.35" attack="0.7" />
-		<!-- Neutro contra Katon -->
+		<element type="doton" defense="0.9" attack="1.1" />
+		<element type="suiton" defense="0.8" attack="1.2" /> <!-- forte -->
+		<element type="raiton" defense="1.2" attack="0.8" /> <!-- fraco -->
 		<element type="katon" defense="1.0" attack="1.0" />
-		<!-- Neutro contra Fuuton -->
 		<element type="fuuton" defense="1.0" attack="1.0" />
 	</element>
-	
+
+	<!-- 💧 SUITON -->
 	<element id="4" name="Suiton" element="suiton" description="Water Release">
-		<!-- Suiton vs Suiton -->
-		<element type="suiton" defense="1.0" attack="1.0" />
-		<!-- Forte contra Katon -->
-		<element type="katon" defense="1.0" attack="1.0" />
-		<!-- Fraco contra Raiton -->
-		<element type="raiton" defense="1.3" attack="0.75" />
-		<!-- Neutro contra Fuuton -->
+		<element type="suiton" defense="0.9" attack="1.1" />
+		<element type="katon" defense="0.8" attack="1.2" /> <!-- forte -->
+		<element type="raiton" defense="1.2" attack="0.8" /> <!-- fraco -->
 		<element type="fuuton" defense="1.0" attack="1.0" />
-		<!-- Neutro contra Doton -->
 		<element type="doton" defense="1.0" attack="1.0" />
 	</element>
 
+	<!-- 🌪️ FUUTON -->
 	<element id="5" name="Fuuton" element="fuuton" description="Wind Release">
-		<!-- Fuuton vs Fuuton -->
-		<element type="fuuton" defense="0.9" attack="1.2" />
-		<!-- Forte contra Raiton -->
-		<element type="raiton" defense="0.8" attack="1.3" />
-		<!-- Fraco contra Katon -->
-		<element type="katon" defense="1.35" attack="0.7" />
-		<!-- Neutro contra Suiton -->
+		<element type="fuuton" defense="0.9" attack="1.1" />
+		<element type="raiton" defense="0.8" attack="1.2" /> <!-- forte -->
+		<element type="katon" defense="1.2" attack="0.8" /> <!-- fraco -->
 		<element type="suiton" defense="1.0" attack="1.0" />
-		<!-- Neutro contra Doton -->
 		<element type="doton" defense="1.0" attack="1.0" />
 	</element>
 
