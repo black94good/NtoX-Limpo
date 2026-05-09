@@ -2711,6 +2711,7 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Player", "resetIdleTime", LuaScriptInterface::luaPlayerResetIdleTime);
 
 	registerMethod(L, "Player", "sendCreatureSquare", LuaScriptInterface::luaPlayerSendCreatureSquare);
+	registerMethod(L, "Player", "sendCancelTarget", LuaScriptInterface::luaPlayerSendCancelTarget);
 
 	registerMethod(L, "Player", "getClientExpDisplay", LuaScriptInterface::luaPlayerGetClientExpDisplay);
 	registerMethod(L, "Player", "setClientExpDisplay", LuaScriptInterface::luaPlayerSetClientExpDisplay);
@@ -10456,6 +10457,19 @@ int LuaScriptInterface::luaPlayerSendCreatureSquare(lua_State* L) {
 	}
 
 	player->sendCreatureSquare(creature, lua::getNumber<SquareColor_t>(L, 3));
+	lua::pushBoolean(L, true);
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerSendCancelTarget(lua_State* L) {
+	// player:sendCancelTarget()
+	Player* player = lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	player->sendCancelTarget();
 	lua::pushBoolean(L, true);
 	return 1;
 }

@@ -802,6 +802,7 @@ class LuaScriptInterface {
 		static int luaPlayerResetIdleTime(lua_State* L);
 
 		static int luaPlayerSendCreatureSquare(lua_State* L);
+		static int luaPlayerSendCancelTarget(lua_State* L);
 
 		static int luaPlayerGetClientExpDisplay(lua_State* L);
 		static int luaPlayerSetClientExpDisplay(lua_State* L);
