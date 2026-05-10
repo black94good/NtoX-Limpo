@@ -279,6 +279,10 @@ ReturnValue Combat::canDoCombat(Creature* attacker, Creature* target) {
 	if (!attacker) {
 		return events::creature::onTargetCombat(attacker, target);
 	}
+	
+	if (target && !attacker->compareInstance(target->getInstanceID())) {
+		return RETURNVALUE_YOUMAYNOTATTACKTHISCREATURE;
+	}
 
 	if (const Player* targetPlayer = target->getPlayer()) {
 		if (targetPlayer->hasFlag(PlayerFlag_CannotBeAttacked)) {
@@ -571,6 +575,7 @@ void Combat::combatTileEffects(const SpectatorVec& spectators, Creature* caster,
 		Item* item = Item::CreateItem(itemId);
 		if (caster) {
 			item->setOwner(caster->getID());
+			item->setInstanceID(caster->getInstanceID());
 		}
 
 		ReturnValue ret = g_game.internalAddItem(tile, item);

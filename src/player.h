@@ -1057,6 +1057,11 @@ class Player final : public Creature {
 				client->sendWorldLight(lightInfo);
 			}
 		}
+		void refreshWorldView() const {
+			if (client) {
+				client->refreshWorldView();
+			}
+		}
 		void sendChannelsDialog() {
 			if (client) {
 				client->sendChannelsDialog();

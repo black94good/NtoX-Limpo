@@ -464,7 +464,9 @@ class LuaScriptInterface {
 		static int luaItemGetTopParent(lua_State* L);
 
 		static int luaItemGetId(lua_State* L);
-
+		static int luaItemGetInstanceId(lua_State* L);
+		static int luaItemSetInstanceId(lua_State* L);
+		
 		static int luaItemClone(lua_State* L);
 		static int luaItemSplit(lua_State* L);
 		static int luaItemRemove(lua_State* L);
@@ -550,7 +552,10 @@ class LuaScriptInterface {
 		static int luaCreatureCanSeeCreature(lua_State* L);
 		static int luaCreatureCanSeeGhostMode(lua_State* L);
 		static int luaCreatureCanSeeInvisibility(lua_State* L);
-
+		
+		static int luaCreatureGetInstanceId(lua_State* L);
+		static int luaCreatureSetInstanceId(lua_State* L);
+		
 		static int luaCreatureHasParent(lua_State* L);
 		static int luaCreatureGetParent(lua_State* L);
 
@@ -733,7 +738,8 @@ class LuaScriptInterface {
 		static int luaPlayerSendTextMessage(lua_State* L);
 		static int luaPlayerSendChannelMessage(lua_State* L);
 		static int luaPlayerSendPrivateMessage(lua_State* L);
-
+		static int luaPlayerRefreshWorldView(lua_State* L);
+		
 		static int luaPlayerChannelSay(lua_State* L);
 		static int luaPlayerOpenChannel(lua_State* L);
 		static int luaPlayerCloseChannel(lua_State* L);

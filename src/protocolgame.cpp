@@ -24,7 +24,20 @@ extern CreatureEvents* g_creatureEvents;
 extern Chat* g_chat;
 
 namespace {
+	
+	bool canSeeItemInInstance(uint32_t viewerInstanceId, const Item* item) {
+		if (!item) {
+			return false;
+		}
 
+		const uint32_t itemInstanceId = item->getInstanceID();
+		if (itemInstanceId == viewerInstanceId) {
+			return true;
+		}
+
+		return itemInstanceId == 0 && item->isLoadedFromMap();
+	}
+	
 	std::deque<std::pair<int64_t, uint32_t>> waitList; // (timeout, player guid)
 	auto priorityEnd = waitList.end();
 
@@ -571,6 +584,10 @@ void ProtocolGame::GetTileDescription(const Tile* tile, NetworkMessage& msg) {
 	const TileItemVector* items = tile->getItemList();
 	if (items) {
 		for (auto it = items->getBeginTopItem(), end = items->getEndTopItem(); it != end; ++it) {
+			if (!canSeeItemInInstance(player->getInstanceID(), *it)) {
+				continue;
+			}
+			
 			msg.addItem(*it);
 
 			if (++count == MAX_STACKPOS) {
@@ -597,6 +614,10 @@ void ProtocolGame::GetTileDescription(const Tile* tile, NetworkMessage& msg) {
 
 	if (items && count < MAX_STACKPOS) {
 		for (auto it = items->getBeginDownItem(), end = items->getEndDownItem(); it != end; ++it) {
+			if (!canSeeItemInInstance(player->getInstanceID(), *it)) {
+				continue;
+			}
+			
 			msg.addItem(*it);
 
 			if (++count == MAX_STACKPOS) {
@@ -691,6 +712,10 @@ bool ProtocolGame::canSee(const Creature* c) const {
 		return false;
 	}
 
+	if (!player->compareInstance(c->getInstanceID())) {
+		return false;
+	}
+	
 	if (!player->canSeeCreature(c)) {
 		return false;
 	}
@@ -2337,11 +2362,23 @@ void ProtocolGame::sendMapDescription(const Position& pos) {
 	writeToOutputBuffer(msg);
 }
 
+void ProtocolGame::refreshWorldView() {
+	if (!player) {
+		return;
+	}
+
+	knownCreatureSet.clear();
+	sendMapDescription(player->getPosition());
+}
+
 void ProtocolGame::sendAddTileItem(const Position& pos, uint32_t stackpos, const Item* item) {
 	if (!canSee(pos)) {
 		return;
 	}
-
+	if (!canSeeItemInInstance(player->getInstanceID(), item)) {
+		return;
+	}
+	
 	NetworkMessage msg;
 	msg.addByte(0x6A);
 	msg.addPosition(pos);
@@ -2354,6 +2391,10 @@ void ProtocolGame::sendUpdateTileItem(const Position& pos, uint32_t stackpos, co
 	if (!canSee(pos)) {
 		return;
 	}
+	if (!canSeeItemInInstance(player->getInstanceID(), item)) {
+		return;
+	}
+
 
 	NetworkMessage msg;
 	msg.addByte(0x6B);

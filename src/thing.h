@@ -80,7 +80,17 @@ class Thing {
 		virtual bool isRemoved() const {
 			return true;
 		}
-
+		
+		uint32_t getInstanceID() const {
+			return instanceID;
+		}
+		void setInstanceID(uint32_t id) {
+			instanceID = id;
+		}
+		bool compareInstance(uint32_t id) const {
+			return instanceID == id;
+		}
+		
 		virtual ReturnValue queryAdd(int32_t, const Thing&, uint32_t, uint32_t, Creature* = nullptr) const { return RETURNVALUE_NOTPOSSIBLE; }
 		virtual ReturnValue queryMaxCount(int32_t, const Thing&, uint32_t, uint32_t&, uint32_t) const { return RETURNVALUE_NOTPOSSIBLE; }
 		virtual ReturnValue queryRemove(const Thing&, uint32_t, uint32_t, Creature* = nullptr) const { return RETURNVALUE_NOTPOSSIBLE; }
@@ -110,6 +120,7 @@ class Thing {
 
 	private:
 		Thing* parent = nullptr;
+		uint32_t instanceID = 0;
 };
 
 #endif // FS_THING_H

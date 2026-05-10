@@ -50,7 +50,8 @@ class ProtocolGame final : public Protocol {
 
 		void login(const std::string& name, uint32_t accountId, OperatingSystem_t operatingSystem);
 		void logout(bool displayEffect, bool forced);
-
+		void refreshWorldView();
+		
 		uint16_t getVersion() const {
 			return version;
 		}

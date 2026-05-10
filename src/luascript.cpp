@@ -2370,7 +2370,9 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Item", "getTopParent", LuaScriptInterface::luaItemGetTopParent);
 
 	registerMethod(L, "Item", "getId", LuaScriptInterface::luaItemGetId);
-
+	registerMethod(L, "Item", "getInstanceId", LuaScriptInterface::luaItemGetInstanceId);
+	registerMethod(L, "Item", "setInstanceId", LuaScriptInterface::luaItemSetInstanceId);
+	
 	registerMethod(L, "Item", "clone", LuaScriptInterface::luaItemClone);
 	registerMethod(L, "Item", "split", LuaScriptInterface::luaItemSplit);
 	registerMethod(L, "Item", "remove", LuaScriptInterface::luaItemRemove);
@@ -2459,7 +2461,9 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Creature", "canSeeCreature", LuaScriptInterface::luaCreatureCanSeeCreature);
 	registerMethod(L, "Creature", "canSeeGhostMode", LuaScriptInterface::luaCreatureCanSeeGhostMode);
 	registerMethod(L, "Creature", "canSeeInvisibility", LuaScriptInterface::luaCreatureCanSeeInvisibility);
-
+	registerMethod(L, "Creature", "getInstanceId", LuaScriptInterface::luaCreatureGetInstanceId);
+	registerMethod(L, "Creature", "setInstanceId", LuaScriptInterface::luaCreatureSetInstanceId);
+	
 	registerMethod(L, "Creature", "hasParent", LuaScriptInterface::luaCreatureHasParent);
 	registerMethod(L, "Creature", "getParent", LuaScriptInterface::luaCreatureGetParent);
 
@@ -2643,6 +2647,7 @@ void LuaScriptInterface::registerFunctions() {
 	registerMethod(L, "Player", "sendTextMessage", LuaScriptInterface::luaPlayerSendTextMessage);
 	registerMethod(L, "Player", "sendChannelMessage", LuaScriptInterface::luaPlayerSendChannelMessage);
 	registerMethod(L, "Player", "sendPrivateMessage", LuaScriptInterface::luaPlayerSendPrivateMessage);
+	registerMethod(L, "Player", "refreshWorldView", LuaScriptInterface::luaPlayerRefreshWorldView);
 	registerMethod(L, "Player", "channelSay", LuaScriptInterface::luaPlayerChannelSay);
 	registerMethod(L, "Player", "openChannel", LuaScriptInterface::luaPlayerOpenChannel);
 	registerMethod(L, "Player", "closeChannel", LuaScriptInterface::luaPlayerCloseChannel);
@@ -6367,6 +6372,29 @@ int LuaScriptInterface::luaItemGetId(lua_State* L) {
 	return 1;
 }
 
+int LuaScriptInterface::luaItemGetInstanceId(lua_State* L) {
+	// item:getInstanceId()
+	Item* item = lua::getUserdata<Item>(L, 1);
+	if (item) {
+		lua_pushnumber(L, item->getInstanceID());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaItemSetInstanceId(lua_State* L) {
+	// item:setInstanceId(instanceId)
+	Item* item = lua::getUserdata<Item>(L, 1);
+	if (item) {
+		item->setInstanceID(lua::getNumber<uint32_t>(L, 2, 0));
+		lua::pushBoolean(L, true);
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
 int LuaScriptInterface::luaItemClone(lua_State* L) {
 	// item:clone()
 	Item* item = lua::getUserdata<Item>(L, 1);
@@ -7500,6 +7528,47 @@ int LuaScriptInterface::luaCreatureCanSeeInvisibility(lua_State* L) {
 	} else {
 		lua_pushnil(L);
 	}
+	return 1;
+}
+
+int LuaScriptInterface::luaCreatureGetInstanceId(lua_State* L) {
+	// creature:getInstanceId()
+	Creature* creature = lua::getUserdata<Creature>(L, 1);
+	if (creature) {
+		lua_pushnumber(L, creature->getInstanceID());
+	} else {
+		lua_pushnil(L);
+	}
+	return 1;
+}
+
+int LuaScriptInterface::luaCreatureSetInstanceId(lua_State* L) {
+	// creature:setInstanceId(instanceId)
+	Creature* creature = lua::getUserdata<Creature>(L, 1);
+	if (!creature) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	uint32_t previousInstanceId = creature->getInstanceID();
+	uint32_t instanceId = lua::getNumber<uint32_t>(L, 2, 0);
+	creature->setInstanceID(instanceId);
+
+	if (previousInstanceId != instanceId) {
+		SpectatorVec spectators;
+		g_game.map.getSpectators(spectators, creature->getPosition(), true, true);
+		for (Creature* spectator : spectators) {
+			if (Player* spectatorPlayer = spectator->getPlayer()) {
+				spectatorPlayer->refreshWorldView();
+			}
+		}
+
+		if (Player* player = creature->getPlayer()) {
+			player->refreshWorldView();
+		}
+	}
+
+	lua::pushBoolean(L, true);
 	return 1;
 }
 
@@ -9618,6 +9687,19 @@ int LuaScriptInterface::luaPlayerSendTextMessage(lua_State* L) {
 	player->sendTextMessage(message);
 	lua::pushBoolean(L, true);
 
+	return 1;
+}
+
+int LuaScriptInterface::luaPlayerRefreshWorldView(lua_State* L) {
+	// player:refreshWorldView()
+	Player* player = lua::getUserdata<Player>(L, 1);
+	if (!player) {
+		lua_pushnil(L);
+		return 1;
+	}
+
+	player->refreshWorldView();
+	lua::pushBoolean(L, true);
 	return 1;
 }
 

@@ -70,6 +70,10 @@ bool Creature::canSee(const Position& pos) const {
 }
 
 bool Creature::canSeeCreature(const Creature* creature) const {
+	if (!creature || !compareInstance(creature->getInstanceID())) {
+		return false;
+	}
+	
 	if (!canSeeGhostMode(creature) && creature->isInGhostMode()) {
 		return false;
 	}

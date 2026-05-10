@@ -46,6 +46,12 @@ extern MoveEvents* g_moveEvents;
 extern Weapons* g_weapons;
 extern Scripts* g_scripts;
 
+namespace {
+	bool canInteractInSameInstance(const Creature* first, const Creature* second) {
+		return first && second && first->compareInstance(second->getInstanceID());
+	}
+}
+
 Game::Game() {
 	offlineTrainingWindow.defaultEnterButton = 0;
 	offlineTrainingWindow.defaultEscapeButton = 1;
@@ -1216,6 +1222,9 @@ ReturnValue Game::internalMoveItem(Thing* fromThing, Thing* toThing, int32_t ind
 
 	//add item
 	if (moveItem) {
+		if (actorPlayer && toThing->getTile()) {
+			moveItem->setInstanceID(actorPlayer->getInstanceID());
+		}
 		fromThing->removeThing(item, moveCount);
 		toThing->addThing(index, moveItem);
 	}
@@ -2569,7 +2578,12 @@ void Game::playerRequestTrade(uint32_t playerId, const Position& pos, uint8_t st
 		player->sendCancelMessage("Select a player to trade with.");
 		return;
 	}
-
+	
+	if (!canInteractInSameInstance(player, tradePartner)) {
+		player->sendCancelMessage("Select a player to trade with.");
+		return;
+	}
+	
 	if (!tradePartner->getPosition().isInRange(player->getPosition(), 2, 2, 0)) {
 		player->sendCancelMessage(RETURNVALUE_DESTINATIONOUTOFREACH);
 		return;
@@ -3144,7 +3158,13 @@ void Game::playerSetAttackedCreature(uint32_t playerId, uint32_t creatureId) {
 		player->sendCancelTarget();
 		return;
 	}
-
+	
+	if (!canInteractInSameInstance(player, attackCreature)) {
+		player->removeAttackedCreature();
+		player->sendCancelTarget();
+		return;
+	}
+	
 	ReturnValue ret = Combat::canTargetCreature(player, attackCreature);
 	if (ret != RETURNVALUE_NOERROR) {
 		player->sendCancelMessage(ret);
@@ -3166,8 +3186,12 @@ void Game::playerFollowCreature(uint32_t playerId, uint32_t creatureId) {
 	}
 
 	player->removeAttackedCreature();
-
+	
 	if (Creature* followCreature = getCreatureByID(creatureId)) {
+		if (!canInteractInSameInstance(player, followCreature)) {
+			player->removeFollowCreature();
+			return;
+		}
 		player->setFollowCreature(followCreature);
 	} else {
 		player->removeFollowCreature();
@@ -3769,6 +3793,11 @@ bool Game::combatBlockHit(CombatDamage& damage, Creature* attacker, Creature* ta
 		return true;
 	}
 
+	if (attacker && !canInteractInSameInstance(attacker, target)) {
+		return true;
+	}
+
+
 	if (target->getPlayer() && target->isInGhostMode()) {
 		return true;
 	}
@@ -3971,6 +4000,9 @@ void Game::combatGetTypeInfo(CombatType_t combatType, Creature* target, TextColo
 }
 
 bool Game::combatChangeHealth(Creature* attacker, Creature* target, CombatDamage& damage) {
+	if (attacker && !canInteractInSameInstance(attacker, target)) {
+		return false;
+	}
 	const Position& targetPos = target->getPosition();
 	if (damage.primary.value > 0) {
 		if (target->isDead()) {

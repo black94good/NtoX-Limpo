@@ -172,7 +172,10 @@ bool Item::equals(const Item* otherItem) const {
 	if (!otherItem || id != otherItem->id) {
 		return false;
 	}
-
+	if (!compareInstance(otherItem->getInstanceID())) {
+		return false;
+	}
+	
 	const auto& otherAttributes = otherItem->attributes;
 	if (!attributes) {
 		return !otherAttributes || (otherAttributes->attributeBits == 0);

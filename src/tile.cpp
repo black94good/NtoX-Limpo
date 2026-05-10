@@ -23,6 +23,21 @@ extern MoveEvents* g_moveEvents;
 StaticTile real_nullptr_tile(0xFFFF, 0xFFFF, 0xFF);
 Tile& Tile::nullptr_tile = real_nullptr_tile;
 
+namespace {
+	bool canSeeItemInInstance(uint32_t viewerInstanceId, const Item* item) {
+		if (!item) {
+			return false;
+		}
+
+		const uint32_t itemInstanceId = item->getInstanceID();
+		if (itemInstanceId == viewerInstanceId) {
+			return true;
+		}
+
+		return itemInstanceId == 0 && item->isLoadedFromMap();
+	}
+}
+
 bool Tile::hasProperty(ITEMPROPERTY prop) const {
 	if (ground && ground->hasProperty(prop)) {
 		return true;
@@ -337,6 +352,9 @@ void Tile::onAddTileItem(Item* item) {
 	//send to client
 	for (Creature* spectator : spectators) {
 		if (Player* spectatorPlayer = spectator->getPlayer()) {
+			if (!canSeeItemInInstance(spectatorPlayer->getInstanceID(), item)) {
+				continue;
+			}
 			spectatorPlayer->sendAddTileItem(this, tilePos, item);
 		}
 	}
@@ -373,6 +391,9 @@ void Tile::onUpdateTileItem(Item* oldItem, const ItemType& oldType, Item* newIte
 	//send to client
 	for (Creature* spectator : spectators) {
 		if (Player* spectatorPlayer = spectator->getPlayer()) {
+			if (!canSeeItemInInstance(spectatorPlayer->getInstanceID(), newItem)) {
+				continue;
+			}
 			spectatorPlayer->sendUpdateTileItem(this, tilePos, newItem);
 		}
 	}
@@ -399,7 +420,11 @@ void Tile::onRemoveTileItem(const SpectatorVec& spectators, const std::vector<in
 	size_t i = 0;
 	for (Creature* spectator : spectators) {
 		if (Player* tmpPlayer = spectator->getPlayer()) {
-			tmpPlayer->sendRemoveTileThing(tilePos, oldStackPosVector[i++]);
+			int32_t oldStackPos = oldStackPosVector[i++];
+			if (oldStackPos < 0) {
+				continue;
+			}
+			tmpPlayer->sendRemoveTileThing(tilePos, oldStackPos);
 		}
 	}
 
@@ -1165,6 +1190,10 @@ int32_t Tile::getClientIndexOfCreature(const Player* player, const Creature* cre
 }
 
 int32_t Tile::getStackposOfItem(const Player* player, const Item* item) const {
+	if (!player || !canSeeItemInInstance(player->getInstanceID(), item)) {
+		return -1;
+	}
+	
 	int32_t n = 0;
 	if (ground) {
 		if (ground == item) {
@@ -1177,6 +1206,9 @@ int32_t Tile::getStackposOfItem(const Player* player, const Item* item) const {
 	if (items) {
 		if (item->isAlwaysOnTop()) {
 			for (auto it = items->getBeginTopItem(), end = items->getEndTopItem(); it != end; ++it) {
+				if (!canSeeItemInInstance(player->getInstanceID(), *it)) {
+					continue;
+				}
 				if (*it == item) {
 					return n;
 				} else if (++n == MAX_STACKPOS) {
@@ -1184,9 +1216,13 @@ int32_t Tile::getStackposOfItem(const Player* player, const Item* item) const {
 				}
 			}
 		} else {
-			n += items->getTopItemCount();
-			if (n >= MAX_STACKPOS) {
-				return -1;
+			for (auto it = items->getBeginTopItem(), end = items->getEndTopItem(); it != end; ++it) {
+				if (!canSeeItemInInstance(player->getInstanceID(), *it)) {
+					continue;
+				}
+				if (++n >= MAX_STACKPOS) {
+					return -1;
+				}
 			}
 		}
 	}
@@ -1203,6 +1239,9 @@ int32_t Tile::getStackposOfItem(const Player* player, const Item* item) const {
 
 	if (items && !item->isAlwaysOnTop()) {
 		for (auto it = items->getBeginDownItem(), end = items->getEndDownItem(); it != end; ++it) {
+			if (!canSeeItemInInstance(player->getInstanceID(), *it)) {
+				continue;
+			}
 			if (*it == item) {
 				return n;
 			} else if (++n >= MAX_STACKPOS) {

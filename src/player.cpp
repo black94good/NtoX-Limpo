@@ -665,7 +665,11 @@ bool Player::canSeeCreature(const Creature* creature) const {
 	if (creature == this) {
 		return true;
 	}
-
+	
+	if (!creature || !compareInstance(creature->getInstanceID())) {
+		return false;
+	}
+	
 	if (creature->isInGhostMode() && !canSeeGhostMode(creature)) {
 		return false;
 	}
