@@ -153,6 +153,19 @@ int32_t Elements::getElementId(const std::string& name) const
 	return -1;
 }
 
+std::vector<std::pair<uint16_t, std::string>> Elements::getChoices(bool includeNone) const
+{
+	std::vector<std::pair<uint16_t, std::string>> choices;
+	for (const auto& [id, element] : elements) {
+		if (!includeNone && id == 0) {
+			continue;
+		}
+
+		choices.emplace_back(id, element.name);
+	}
+	return choices;
+}
+
 
 float Element::getAttackFactor(CombatType_t combatType) const
 {

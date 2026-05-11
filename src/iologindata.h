@@ -18,6 +18,7 @@ struct VIPEntry;
 class IOLoginData {
 	public:
 		static std::pair<uint32_t, std::string> gameworldAuthentication(std::string_view accountName, std::string_view password, std::string_view characterName, std::string_view token, uint32_t tokenTime);
+		static std::pair<uint32_t, std::string> accountManagerAuthentication(std::string_view accountName, std::string_view password);
 		static uint32_t getAccountIdByPlayerName(const std::string& playerName);
 		static uint32_t getAccountIdByPlayerId(uint32_t playerId);
 
@@ -43,6 +44,7 @@ class IOLoginData {
 		static void removeVIPEntry(uint32_t accountId, uint32_t guid);
 
 		static void updatePremiumTime(uint32_t accountId, time_t endTime);
+		static bool accountExists(const std::string& accountName);
 
 	private:
 		using ItemMap = std::map<uint32_t, std::pair<Item*, uint32_t>>;

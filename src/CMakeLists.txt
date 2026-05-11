@@ -1,5 +1,6 @@
 set(tfs_SRC
 	${CMAKE_CURRENT_LIST_DIR}/otpch.cpp
+	${CMAKE_CURRENT_LIST_DIR}/accountmanager.cpp
 	${CMAKE_CURRENT_LIST_DIR}/actions.cpp
 	${CMAKE_CURRENT_LIST_DIR}/ban.cpp
 	${CMAKE_CURRENT_LIST_DIR}/baseevents.cpp
@@ -78,6 +79,7 @@ set(tfs_SRC
 
 set(tfs_HDR
 	${CMAKE_CURRENT_LIST_DIR}/otpch.h
+	${CMAKE_CURRENT_LIST_DIR}/accountmanager.h
 	${CMAKE_CURRENT_LIST_DIR}/actions.h
 	${CMAKE_CURRENT_LIST_DIR}/ban.h
 	${CMAKE_CURRENT_LIST_DIR}/baseevents.h
@@ -173,6 +175,7 @@ target_link_libraries(tfslib PRIVATE
 	Boost::system
 	fmt::fmt
 	OpenSSL::Crypto
+	OpenSSL::SSL
 	pugixml::pugixml
 	${CMAKE_THREAD_LIBS_INIT}
 	${LUA_LIBRARIES}

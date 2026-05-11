@@ -239,6 +239,30 @@ class Player final : public Creature {
 		Element* getPlayerElement() const { return element; }
 		uint16_t getElementId() const { return element ? element->getId() : 0; }
 		bool hasElement(ElementType_t elementType) const;
+		bool isAccountManager() const;
+
+		void setAccountManagerState(uint32_t value) { accountManagerState = value; }
+		uint32_t getAccountManagerState() const { return accountManagerState; }
+		void setTempAccountName(std::string value) { tempAccountName = std::move(value); }
+		const std::string& getTempAccountName() const { return tempAccountName; }
+		void setTempPassword(std::string value) { tempPassword = std::move(value); }
+		const std::string& getTempPassword() const { return tempPassword; }
+		void setTempEmail(std::string value) { tempEmail = std::move(value); }
+		const std::string& getTempEmail() const { return tempEmail; }
+		void setTempEmailCode(std::string value) { tempEmailCode = std::move(value); }
+		const std::string& getTempEmailCode() const { return tempEmailCode; }
+		void setTempEmailCodeExpiresAt(time_t value) { tempEmailCodeExpiresAt = value; }
+		time_t getTempEmailCodeExpiresAt() const { return tempEmailCodeExpiresAt; }
+		void setTempRecoveryAccountId(uint32_t value) { tempRecoveryAccountId = value; }
+		uint32_t getTempRecoveryAccountId() const { return tempRecoveryAccountId; }
+		void setTempCharacterOption(uint32_t value) { tempCharacterOption = value; }
+		uint32_t getTempCharacterOption() const { return tempCharacterOption; }
+		void setTempTownId(uint32_t value) { tempTownId = value; }
+		uint32_t getTempTownId() const { return tempTownId; }
+		void setTempElementId(uint16_t value) { tempElementId = value; }
+		uint16_t getTempElementId() const { return tempElementId; }
+		void setTempPosition(Position value) { tempPosition = value; }
+		const Position& getTempPosition() const { return tempPosition; }
 
 		OperatingSystem_t getOperatingSystem() const {
 			return operatingSystem;
@@ -981,6 +1005,7 @@ class Player final : public Creature {
 				client->sendTextWindow(windowTextId, itemId, text);
 			}
 		}
+		void sendAccountManagerTextWindow(uint32_t id, const std::string& text) const;
 		void sendToChannel(const Creature* creature, SpeakClasses type, const std::string& text, uint16_t channelId) const {
 			if (client) {
 				client->sendToChannel(creature, type, text, channelId);
@@ -1280,6 +1305,17 @@ class Player final : public Creature {
 		
 		//LONNE ELEMENTO 
 		Element* element = nullptr;
+		std::string tempAccountName;
+		std::string tempPassword;
+		std::string tempEmail;
+		std::string tempEmailCode;
+		Position tempPosition;
+		time_t tempEmailCodeExpiresAt = 0;
+		uint32_t tempRecoveryAccountId = 0;
+		uint32_t accountManagerState = 0;
+		uint32_t tempCharacterOption = 0;
+		uint32_t tempTownId = 0;
+		uint16_t tempElementId = 0;
 
 		Inbox_ptr inbox = nullptr;
 		std::map<uint32_t, DepotChest_ptr> depotChests;

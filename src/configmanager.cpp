@@ -227,6 +227,7 @@ bool ConfigManager::load() {
 	boolean[PLAYER_CONSOLE_LOGS] = getGlobalBoolean(L, "showPlayerLogInConsole", true);
 	boolean[CHECK_DUPLICATE_STORAGE_KEYS] = getGlobalBoolean(L, "checkDuplicateStorageKeys", false);
 	boolean[MONSTER_OVERSPAWN] = getGlobalBoolean(L, "monsterOverspawn", false);
+	boolean[SMTP_USE_STARTTLS] = getGlobalBoolean(L, "smtpUseStartTls", true);
 
 	string[DEFAULT_PRIORITY] = getGlobalString(L, "defaultPriority", "high");
 	string[SERVER_NAME] = getGlobalString(L, "serverName", "");
@@ -236,6 +237,11 @@ bool ConfigManager::load() {
 	string[LOCATION] = getGlobalString(L, "location", "");
 	string[MOTD] = getGlobalString(L, "motd", "");
 	string[WORLD_TYPE] = getGlobalString(L, "worldType", "pvp");
+	string[SMTP_HOST] = getGlobalString(L, "smtpHost", "");
+	string[SMTP_USER] = getGlobalString(L, "smtpUser", "");
+	string[SMTP_PASSWORD] = getGlobalString(L, "smtpPassword", "");
+	string[SMTP_FROM] = getGlobalString(L, "smtpFrom", string[OWNER_EMAIL].c_str());
+	string[SMTP_FROM_NAME] = getGlobalString(L, "smtpFromName", string[SERVER_NAME].c_str());
 
 	integer[MAX_PLAYERS] = getGlobalNumber(L, "maxPlayers");
 	integer[PZ_LOCKED] = getGlobalNumber(L, "pzLocked", 60000);
@@ -277,6 +283,7 @@ bool ConfigManager::load() {
 	integer[STAMINA_REGEN_PREMIUM] = getGlobalNumber(L, "timeToRegenMinutePremiumStamina", 10 * 60);
 	integer[PATHFINDING_INTERVAL] = getGlobalNumber(L, "pathfindingInterval", 200);
 	integer[PATHFINDING_DELAY] = getGlobalNumber(L, "pathfindingDelay", 300);
+	integer[SMTP_PORT] = getGlobalNumber(L, "smtpPort", 587);
 
 	expStages = loadXMLStages();
 	if (expStages.empty()) {

@@ -3,6 +3,7 @@
 
 #include "otpch.h"
 
+#include "accountmanager.h"
 #include "otserv.h"
 
 #include "configmanager.h"
@@ -146,6 +147,12 @@ namespace {
 		std::cout << ">> Loading elements" << std::endl;
 		if (!g_elements.loadFromXml()) {
 			startupErrorMessage("Unable to load elements!");
+			return;
+		}
+
+		std::cout << ">> Loading account manager" << std::endl;
+		if (!AccountManager::loadFromXml()) {
+			startupErrorMessage("Unable to load account manager!");
 			return;
 		}
 

@@ -6,6 +6,11 @@
 
 #include "enums.h"
 
+#include <map>
+#include <string>
+#include <utility>
+#include <vector>
+
 struct ElementModifier
 {
 	CombatType_t combatType;
@@ -52,6 +57,7 @@ public:
 	Element* getElement(uint16_t id);
 	Element* getElementByType(ElementType_t elementType);
 	int32_t getElementId(const std::string& name) const;
+	std::vector<std::pair<uint16_t, std::string>> getChoices(bool includeNone = false) const;
 
 private:
 	std::map<uint16_t, Element> elements;

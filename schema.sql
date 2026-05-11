@@ -6,10 +6,14 @@ CREATE TABLE IF NOT EXISTS `accounts` (
   `type` int NOT NULL DEFAULT '1',
   `premium_ends_at` int unsigned NOT NULL DEFAULT '0',
   `email` varchar(255) NOT NULL DEFAULT '',
+  `email_verified` tinyint(1) NOT NULL DEFAULT '0',
   `creation` int NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;
+
+INSERT INTO `accounts` (`id`, `name`, `password`, `secret`, `type`, `premium_ends_at`, `email`, `email_verified`, `creation`) VALUES
+(1, '1', '356a192b7913b04c54574d18c28d46e6395428ab', NULL, 1, 0, '', 0, 0);
 
 CREATE TABLE IF NOT EXISTS `players` (
   `id` int NOT NULL AUTO_INCREMENT,
@@ -18,6 +22,7 @@ CREATE TABLE IF NOT EXISTS `players` (
   `account_id` int NOT NULL DEFAULT '0',
   `level` int NOT NULL DEFAULT '1',
   `vocation` int NOT NULL DEFAULT '0',
+  `element` int NOT NULL DEFAULT '0',
   `health` int NOT NULL DEFAULT '150',
   `healthmax` int NOT NULL DEFAULT '150',
   `experience` bigint unsigned NOT NULL DEFAULT '0',
@@ -73,6 +78,9 @@ CREATE TABLE IF NOT EXISTS `players` (
   FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
   KEY `vocation` (`vocation`)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET=utf8;
+
+INSERT INTO `players` (`id`, `name`, `group_id`, `account_id`, `level`, `vocation`, `element`, `health`, `healthmax`, `experience`, `lookbody`, `lookfeet`, `lookhead`, `looklegs`, `looktype`, `lookaddons`, `currentmount`, `direction`, `maglevel`, `mana`, `manamax`, `manaspent`, `soul`, `town_id`, `posx`, `posy`, `posz`, `conditions`, `cap`, `sex`, `lastlogin`, `lastip`, `save`, `skull`, `skulltime`, `lastlogout`, `blessings`, `onlinetime`, `deletion`, `balance`, `offlinetraining_time`, `offlinetraining_skill`, `stamina`, `skill_fist`, `skill_fist_tries`, `skill_club`, `skill_club_tries`, `skill_sword`, `skill_sword_tries`, `skill_axe`, `skill_axe_tries`, `skill_dist`, `skill_dist_tries`, `skill_shielding`, `skill_shielding_tries`, `skill_fishing`, `skill_fishing_tries`) VALUES
+(1, 'Account Manager', 1, 1, 1, 0, 0, 150, 150, 0, 0, 0, 0, 0, 110, 0, 0, 2, 0, 0, 0, 0, 0, 1, 0, 0, 0, '', 400, 1, 0, 0x00, 1, 0, 0, 0, 0, 0, 0, 0, 43200, -1, 2520, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0, 10, 0);
 
 CREATE TABLE IF NOT EXISTS `account_bans` (
   `account_id` int NOT NULL,

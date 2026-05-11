@@ -46,6 +46,7 @@ namespace ConfigManager {
 		PLAYER_CONSOLE_LOGS,
 		CHECK_DUPLICATE_STORAGE_KEYS,
 		MONSTER_OVERSPAWN,
+		SMTP_USE_STARTTLS,
 
 		LAST_BOOLEAN_CONFIG /* this must be the last one */
 	};
@@ -68,6 +69,11 @@ namespace ConfigManager {
 		MYSQL_SOCK,
 		DEFAULT_PRIORITY,
 		MAP_AUTHOR,
+		SMTP_HOST,
+		SMTP_USER,
+		SMTP_PASSWORD,
+		SMTP_FROM,
+		SMTP_FROM_NAME,
 		CONFIG_FILE,
 
 		LAST_STRING_CONFIG /* this must be the last one */
@@ -119,6 +125,7 @@ namespace ConfigManager {
 		STAMINA_REGEN_PREMIUM,
 		PATHFINDING_INTERVAL,
 		PATHFINDING_DELAY,
+		SMTP_PORT,
 
 		LAST_INTEGER_CONFIG /* this must be the last one */
 	};

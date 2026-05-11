@@ -3,6 +3,7 @@
 
 #include "otpch.h"
 
+#include "accountmanager.h"
 #include "protocolgame.h"
 
 #include "ban.h"
@@ -133,7 +134,8 @@ void ProtocolGame::release() {
 void ProtocolGame::login(const std::string& name, uint32_t accountId, OperatingSystem_t operatingSystem) {
 	//dispatcher thread
 	Player* foundPlayer = g_game.getPlayerByName(name);
-	if (!foundPlayer || getBoolean(ConfigManager::ALLOW_CLONES)) {
+	const bool accountManagerLogin = AccountManager::isEnabled() && name == AccountManager::Name;
+	if (!foundPlayer || getBoolean(ConfigManager::ALLOW_CLONES) || accountManagerLogin) {
 		player = new Player(getThis());
 		player->setName(name);
 
@@ -160,7 +162,7 @@ void ProtocolGame::login(const std::string& name, uint32_t accountId, OperatingS
 			return;
 		}
 
-		if (getBoolean(ConfigManager::ONE_PLAYER_ON_ACCOUNT) && player->getAccountType() < ACCOUNT_TYPE_GAMEMASTER && g_game.getPlayerByAccount(player->getAccount())) {
+		if (!accountManagerLogin && getBoolean(ConfigManager::ONE_PLAYER_ON_ACCOUNT) && player->getAccountType() < ACCOUNT_TYPE_GAMEMASTER && g_game.getPlayerByAccount(player->getAccount())) {
 			disconnectClient("You may only login with one character\nof your account at the same time.");
 			return;
 		}
@@ -191,10 +193,18 @@ void ProtocolGame::login(const std::string& name, uint32_t accountId, OperatingS
 			disconnectClient("Your character could not be loaded.");
 			return;
 		}
+		if (accountManagerLogin) {
+			player->accountNumber = accountId;
+		}
 
 		player->setOperatingSystem(operatingSystem);
 
-		if (!g_game.placeCreature(player, player->getLoginPosition())) {
+		if (accountManagerLogin && AccountManager::getPosition() != Position()) {
+			if (!g_game.placeCreature(player, AccountManager::getPosition()) && !g_game.placeCreature(player, player->getTemplePosition(), false, true)) {
+				disconnectClient("Unable to spawn Account Manager. Contact the administrator.");
+				return;
+			}
+		} else if (!g_game.placeCreature(player, player->getLoginPosition())) {
 			if (!g_game.placeCreature(player, player->getTemplePosition(), false, true)) {
 				disconnectClient("Temple position is wrong. Contact the administrator.");
 				return;
@@ -360,7 +370,10 @@ void ProtocolGame::onRecvFirstMessage(NetworkMessage& msg) {
 		return;
 	}
 
-	if (accountName.empty()) {
+	if (accountName.empty() && password.empty() && AccountManager::isEnabled() && AccountManager::allowNoPasswordLogin()) {
+		accountName = AccountManager::getAuthPassword();
+		password = AccountManager::getAuthPassword();
+	} else if (accountName.empty()) {
 		disconnectClient("You must enter your account name.");
 		return;
 	}
@@ -395,6 +408,9 @@ void ProtocolGame::onRecvFirstMessage(NetworkMessage& msg) {
 	}
 
 	auto[accountId, charName] = IOLoginData::gameworldAuthentication(accountName, password, characterName, token, tokenTime);
+	if (accountId == 0 && AccountManager::isEnabled() && characterName == AccountManager::Name) {
+		std::tie(accountId, charName) = IOLoginData::accountManagerAuthentication(accountName, password);
+	}
 	if (accountId == 0) {
 		disconnectClient("Account name or password is not correct.");
 		return;
@@ -470,6 +486,22 @@ void ProtocolGame::parsePacket(NetworkMessage& msg) {
 		if (recvbyte != 0x14) {
 			return;
 		}
+	}
+
+	if (player->isAccountManager()) {
+		switch (recvbyte) {
+			case 0x14: g_dispatcher.addTask([thisPtr = getThis()]() { thisPtr->logout(true, false); }); break;
+			case 0x1D: g_dispatcher.addTask([playerID = player->getID()]() { g_game.playerReceivePingBack(playerID); }); break;
+			case 0x1E: g_dispatcher.addTask([playerID = player->getID()]() { g_game.playerReceivePing(playerID); }); break;
+			case 0x89: parseTextWindow(msg); break;
+			case 0xF9: parseModalWindowAnswer(msg); break;
+			default: g_dispatcher.addTask([playerID = player->getID()]() { g_game.doAccountManagerReset(playerID); }); break;
+		}
+
+		if (msg.isOverrun()) {
+			disconnect();
+		}
+		return;
 	}
 
 	switch (recvbyte) {
@@ -1010,6 +1042,13 @@ void ProtocolGame::parseEquipObject(NetworkMessage& msg) {
 void ProtocolGame::parseTextWindow(NetworkMessage& msg) {
 	uint32_t windowTextID = msg.get<uint32_t>();
 	auto newText = msg.getString();
+	if (player->isAccountManager()) {
+		g_dispatcher.addTask([playerID = player->getID(), windowTextID, newText]() {
+			g_game.onAccountManagerReceiveText(playerID, windowTextID, newText);
+		});
+		return;
+	}
+
 	g_dispatcher.addTask([playerID = player->getID(), windowTextID, newText]() {
 		g_game.playerWriteItem(playerID, windowTextID, newText);
 	});
@@ -2752,11 +2791,15 @@ void ProtocolGame::sendTextWindow(uint32_t windowTextId, Item* item, uint16_t ma
 }
 
 void ProtocolGame::sendTextWindow(uint32_t windowTextId, uint32_t itemId, const std::string& text) {
+	sendTextWindow(windowTextId, itemId, text, text.size());
+}
+
+void ProtocolGame::sendTextWindow(uint32_t windowTextId, uint32_t itemId, const std::string& text, uint16_t maxlen) {
 	NetworkMessage msg;
 	msg.addByte(0x96);
 	msg.add<uint32_t>(windowTextId);
 	msg.addItem(itemId, 1);
-	msg.add<uint16_t>(text.size());
+	msg.add<uint16_t>(maxlen);
 	msg.addString(text);
 	msg.add<uint16_t>(0x00);
 	msg.add<uint16_t>(0x00);

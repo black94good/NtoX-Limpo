@@ -3,6 +3,7 @@
 
 #include "otpch.h"
 
+#include "accountmanager.h"
 #include "player.h"
 
 #include "bed.h"
@@ -97,6 +98,11 @@ bool Player::hasElement(ElementType_t elementType) const
 		return true;
 	}
 	return false;
+}
+
+bool Player::isAccountManager() const
+{
+	return AccountManager::isAccountManager(guid, name);
 }
 
 bool Player::isPushable() const {
@@ -896,6 +902,19 @@ void Player::sendHouseWindow(House* house, uint32_t listId) const {
 	}
 }
 
+void Player::sendAccountManagerTextWindow(uint32_t id, const std::string& text) const
+{
+	if (client) {
+		uint16_t maxLength = 29;
+		if (id == AccountManager::TEXT_EMAIL || id == AccountManager::TEXT_RECOVERY_EMAIL) {
+			maxLength = 255;
+		} else if (id == AccountManager::TEXT_EMAIL_CODE || id == AccountManager::TEXT_RECOVERY_CODE) {
+			maxLength = 6;
+		}
+		client->sendTextWindow(id, ITEM_LETTER, text, maxLength);
+	}
+}
+
 //container
 void Player::sendAddContainerItem(const Container* container, const Item* item) {
 	if (!client) {
@@ -1008,6 +1027,15 @@ void Player::onCreatureAppear(Creature* creature, bool isLogin) {
 	Creature::onCreatureAppear(creature, isLogin);
 
 	if (isLogin && creature == this) {
+		if (isAccountManager()) {
+			storedConditionList.clear();
+			g_game.doAccountManagerLogin(this);
+			if (getBoolean(ConfigManager::PLAYER_CONSOLE_LOGS)) {
+				std::cout << name << " has logged in." << std::endl;
+			}
+			return;
+		}
+
 		sendItems();
 
 		for (int32_t slot = CONST_SLOT_FIRST; slot <= CONST_SLOT_LAST; ++slot) {
@@ -1164,7 +1192,9 @@ void Player::onRemoveCreature(Creature* creature, bool isLogout) {
 			guild->removeMember(this);
 		}
 
-		IOLoginData::updateOnlineStatus(guid, false);
+		if (!isAccountManager()) {
+			IOLoginData::updateOnlineStatus(guid, false);
+		}
 
 		bool saved = false;
 		for (uint32_t tries = 0; tries < 3; ++tries) {

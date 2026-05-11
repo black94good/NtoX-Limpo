@@ -311,6 +311,11 @@ class Game {
 		void playerDebugAssert(uint32_t playerId, const std::string& assertLine, const std::string& date, const std::string& description, const std::string& comment);
 		void playerAnswerModalWindow(uint32_t playerId, uint32_t modalWindowId, uint8_t button, uint8_t choice);
 		void playerReportRuleViolation(uint32_t playerId, const std::string& targetName, uint8_t reportType, uint8_t reportReason, const std::string& comment, const std::string& translation);
+		void doAccountManagerLogin(Player* player);
+		void doAccountManagerReset(uint32_t playerId);
+		void onAccountManagerInput(Player* player, uint32_t modalWindowId, uint8_t button, uint8_t choice);
+		void onAccountManagerReceiveText(uint32_t playerId, uint32_t windowId, const std::string& text);
+		ModalWindow createAccountManagerWindow(uint32_t modalWindowId, uint32_t optionId = 0);
 
 		bool internalStartTrade(Player* player, Player* tradePartner, Item* tradeItem);
 		void internalCloseTrade(Player* player, bool sendCancel = true);

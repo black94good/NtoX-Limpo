@@ -3,6 +3,7 @@
 
 #include "otpch.h"
 
+#include "accountmanager.h"
 #include "globalevent.h"
 
 #include "actions.h"
@@ -10,6 +11,7 @@
 #include "configmanager.h"
 #include "creature.h"
 #include "creatureevent.h"
+#include "database.h"
 #include "databasetasks.h"
 #include "depotchest.h"
 #include "events.h"
@@ -47,6 +49,28 @@ extern Weapons* g_weapons;
 extern Scripts* g_scripts;
 
 namespace {
+	constexpr time_t ACCOUNT_MANAGER_EMAIL_CODE_TTL = 10 * 60;
+
+	bool accountManagerEmailInUse(const std::string& email)
+	{
+		Database& db = Database::getInstance();
+		return db.storeQuery(fmt::format("SELECT 1 FROM `accounts` WHERE `email` = {:s} AND `email_verified` = 1 LIMIT 1", db.escapeString(email))).get() != nullptr;
+	}
+
+	uint32_t getRecoveryAccountId(const std::string& accountName, const std::string& email)
+	{
+		Database& db = Database::getInstance();
+		DBResult_ptr result = db.storeQuery(fmt::format(
+		    "SELECT `id` FROM `accounts` WHERE `name` = {:s} AND `email` = {:s} AND `email_verified` = 1 LIMIT 1",
+		    db.escapeString(accountName), db.escapeString(email)));
+		return result ? result->getNumber<uint32_t>("id") : 0;
+	}
+
+	bool isAccountManagerCodeValid(const Player* player, const std::string& text)
+	{
+		return player && !player->getTempEmailCode().empty() && text == player->getTempEmailCode() && time(nullptr) <= player->getTempEmailCodeExpiresAt();
+	}
+
 	bool canInteractInSameInstance(const Creature* first, const Creature* second) {
 		return first && second && first->compareInstance(second->getInstanceID());
 	}
@@ -5534,6 +5558,752 @@ void Game::sendOfflineTrainingDialog(Player* player) {
 	}
 }
 
+ModalWindow Game::createAccountManagerWindow(uint32_t modalWindowId, uint32_t optionId /*= 0*/)
+{
+	ModalWindow window(modalWindowId, "Account Manager", "");
+	window.priority = true;
+	window.defaultEnterButton = AccountManager::BUTTON_PRIMARY;
+	window.defaultEscapeButton = AccountManager::BUTTON_SECONDARY;
+
+	switch (modalWindowId) {
+		case AccountManager::WINDOW_COMMON_LOGIN:
+			window.title = "Account Manager";
+			window.message = "Escolha o que voce quer fazer. Criar Conta cria uma conta nova com confirmacao por email. Recuperar Senha envia um codigo para o email cadastrado.";
+			window.choices.emplace_back("Criar Conta", AccountManager::CHOICE_FIRST);
+			window.choices.emplace_back("Recuperar Senha", AccountManager::CHOICE_SECOND);
+			window.buttons.emplace_back("Selecionar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Sair", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_ACCOUNT_RULES:
+		case AccountManager::WINDOW_PRIVATE_ACCOUNT_RULES:
+			window.title = "Nome da Conta";
+			window.message = "Agora vamos criar o NOME DA CONTA. Na proxima tela, digite o nome que voce quer usar para entrar. "
+			                 "Regras: 6 a 29 caracteres, somente letras e numeros, sem espaco e sem simbolos. Exemplo: ninja123.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_RULES:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RULES:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET:
+			window.title = "Senha";
+			window.message = "Agora escolha a SENHA. Na proxima tela, digite sua senha. "
+			                 "Regras: 6 a 29 caracteres, somente letras e numeros, sem espaco e sem simbolos. Exemplo: senha123.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_CONFIRM:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_CONFIRM:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_CONFIRM:
+			window.title = "Confirmar Senha";
+			window.message = "Digite a MESMA senha novamente na proxima tela. Se uma letra ou numero ficar diferente, a conta nao sera criada.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_SUCCESS:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_SUCCESS:
+			window.title = "Conta Criada";
+			window.message = "Sua conta foi criada com sucesso. Agora clique em Sair, entre novamente com o nome da conta e a senha que voce acabou de escolher, "
+			                 "e selecione Account Manager na lista para criar seu personagem.";
+			window.buttons.emplace_back("Sair", AccountManager::BUTTON_PRIMARY);
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_RULES:
+			window.title = "Email";
+			window.message = "Agora digite um email valido. O servidor vai enviar um codigo para confirmar que o email e seu. Esse email tambem sera usado para recuperar a senha.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_FAILED:
+			window.title = "Email Invalido";
+			window.message = "Nao consegui aceitar esse email. Ele pode estar invalido ou ja estar sendo usado por outra conta confirmada.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_CODE:
+			window.title = "Codigo do Email";
+			window.message = "Enviamos um codigo de 6 numeros para o email informado. Digite esse codigo na proxima tela. Ele vale por 10 minutos.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Reenviar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_CODE_FAILED:
+			window.title = "Codigo Invalido";
+			window.message = "O codigo esta errado ou expirou. Confira o email e tente novamente, ou clique em Reenviar.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Reenviar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_SEND_FAILED:
+			window.title = "Email Nao Enviado";
+			window.message = "Nao consegui enviar o codigo. Confira a configuracao SMTP no config.lua e tente novamente.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_ACCOUNT_FAILED:
+		case AccountManager::WINDOW_PRIVATE_ACCOUNT_FAILED:
+			window.title = "Conta Invalida";
+			window.message = "Nao consegui aceitar esse nome de conta. Motivos comuns: tem menos de 6 caracteres, tem mais de 29, tem espaco, tem simbolo, "
+			                 "ou essa conta ja existe. Tente algo como ninja123.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_FAILED:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_FAILED:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_FAILED:
+			window.title = "Senha Invalida";
+			window.message = "Nao consegui aceitar essa senha. Use 6 a 29 caracteres, somente letras e numeros, sem espaco e sem simbolos. Exemplo: senha123.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_MISMATCH:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_MISMATCH:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_MISMATCH:
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_MISMATCH:
+			window.title = "Senha Diferente";
+			window.message = "As duas senhas nao ficaram iguais. Clique em Tentar para repetir a confirmacao, ou em Nova Senha para escolher outra senha desde o inicio.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Nova Senha", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_ACCOUNT:
+			window.title = "Recuperar Senha";
+			window.message = "Digite o nome da conta que voce quer recuperar.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_EMAIL:
+			window.title = "Email da Conta";
+			window.message = "Agora digite o email confirmado dessa conta. Se a conta e o email baterem, enviaremos um codigo de recuperacao.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_FAILED:
+			window.title = "Recuperacao Falhou";
+			window.message = "Nao encontrei uma conta confirmada com esse nome e email. Confira os dados e tente novamente.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_CODE:
+			window.title = "Codigo de Recuperacao";
+			window.message = "Enviamos um codigo para o email da conta. Digite esse codigo na proxima tela para escolher uma nova senha.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Reenviar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_CODE_FAILED:
+			window.title = "Codigo Invalido";
+			window.message = "O codigo de recuperacao esta errado ou expirou. Tente novamente ou reenvie o codigo.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Reenviar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_SEND_FAILED:
+			window.title = "Email Nao Enviado";
+			window.message = "Nao consegui enviar o codigo de recuperacao. Confira a configuracao SMTP no config.lua e tente novamente.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD:
+			window.title = "Nova Senha";
+			window.message = "Digite a nova senha da conta. Use 6 a 29 caracteres, somente letras e numeros.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_CONFIRM:
+			window.title = "Confirmar Nova Senha";
+			window.message = "Digite a mesma nova senha novamente.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			window.buttons.emplace_back("Cancelar", AccountManager::BUTTON_TERTIARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_FAILED:
+			window.title = "Senha Invalida";
+			window.message = "Use 6 a 29 caracteres, somente letras e numeros, sem espaco e sem simbolos.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_SUCCESS:
+			window.title = "Senha Alterada";
+			window.message = "Sua senha foi alterada com sucesso. Agora saia e entre com a nova senha.";
+			window.buttons.emplace_back("Sair", AccountManager::BUTTON_PRIMARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_MENU:
+			window.title = "Account Manager";
+			window.message = "Escolha o que voce quer fazer. Para jogar em uma conta nova, primeiro crie uma conta. Depois entre nela e crie o personagem.";
+			window.choices.emplace_back("Criar Personagem", AccountManager::CHOICE_FIRST);
+			window.choices.emplace_back("Criar Nova Conta", AccountManager::CHOICE_SECOND);
+			window.choices.emplace_back("Trocar Senha", AccountManager::CHOICE_THIRD);
+			window.buttons.emplace_back("Selecionar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Sair", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_OPTION:
+			window.title = "Criar Personagem";
+			window.message = "Escolha a base do seu novo personagem. Essa escolha define vocacao, sexo e atributos iniciais.";
+			for (const auto& option : AccountManager::getCharacterOptions()) {
+				window.choices.emplace_back(option.name + (option.sex ? " (masc)" : " (fem)"), option.id);
+			}
+			window.buttons.emplace_back("Selecionar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_TOWN:
+			window.title = "Cidade Inicial";
+			window.message = "Escolha a cidade onde o personagem vai nascer.";
+			if (const auto* option = AccountManager::getCharacterOption(optionId)) {
+				for (uint32_t townId : option->towns) {
+					if (Town* town = map.towns.getTown(townId)) {
+						window.choices.emplace_back(town->getName(), townId);
+					}
+				}
+			}
+			window.buttons.emplace_back("Selecionar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_ELEMENT:
+			window.title = "Elemento";
+			window.message = "Escolha o elemento do personagem. Essa escolha sera salva no personagem criado.";
+			for (const auto& [id, name] : g_elements.getChoices(false)) {
+				window.choices.emplace_back(name, id);
+			}
+			window.buttons.emplace_back("Selecionar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_NAME:
+			window.title = "Nome do Personagem";
+			window.message = "Agora escolha o nome do personagem. Pode usar letras, numeros e espaco. Exemplo: Madara Uchiha.";
+			window.buttons.emplace_back("Digitar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_FAILED:
+			window.title = "Personagem Invalido";
+			window.message = "Nao consegui criar esse personagem. Use 6 a 29 caracteres, letras, numeros e no maximo um espaco entre as palavras.";
+			window.buttons.emplace_back("Tentar", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_SUCCESS:
+			window.title = "Personagem Criado";
+			window.message = "Seu personagem foi criado com sucesso. Clique em Sair, entre novamente na sua conta e selecione o personagem para jogar.";
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Sair", AccountManager::BUTTON_SECONDARY);
+			break;
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_SUCCESS:
+			window.title = "Senha Alterada";
+			window.message = "Sua senha foi alterada com sucesso. Voce ja pode sair e entrar novamente usando a nova senha.";
+			window.buttons.emplace_back("Menu", AccountManager::BUTTON_PRIMARY);
+			window.buttons.emplace_back("Sair", AccountManager::BUTTON_SECONDARY);
+			break;
+		default:
+			window.message = "Escolha uma opcao.";
+			window.buttons.emplace_back("Voltar", AccountManager::BUTTON_PRIMARY);
+			break;
+	}
+
+	return window;
+}
+
+void Game::doAccountManagerLogin(Player* player)
+{
+	if (!player) {
+		return;
+	}
+
+	player->setTempAccountName("");
+	player->setTempPassword("");
+	player->setTempEmail("");
+	player->setTempEmailCode("");
+	player->setTempEmailCodeExpiresAt(0);
+	player->setTempRecoveryAccountId(0);
+	player->setTempCharacterOption(0);
+	player->setTempTownId(0);
+	player->setTempElementId(0);
+	player->setTempPosition(Position());
+	player->setAccountManagerState(0);
+
+	if (player->getAccount() == AccountManager::AccountId) {
+		player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_LOGIN));
+	} else {
+		player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_MENU));
+	}
+}
+
+void Game::doAccountManagerReset(uint32_t playerId)
+{
+	if (Player* player = getPlayerByID(playerId)) {
+		doAccountManagerLogin(player);
+	}
+}
+
+void Game::onAccountManagerInput(Player* player, uint32_t modalWindowId, uint8_t button, uint8_t choice)
+{
+	if (!player) {
+		return;
+	}
+
+	const bool common = player->getAccount() == AccountManager::AccountId;
+	switch (modalWindowId) {
+		case AccountManager::WINDOW_COMMON_LOGIN:
+			if (button == AccountManager::BUTTON_PRIMARY && choice == AccountManager::CHOICE_FIRST) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_ACCOUNT_RULES));
+			} else if (button == AccountManager::BUTTON_PRIMARY && choice == AccountManager::CHOICE_SECOND) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_ACCOUNT));
+			} else {
+				player->kickPlayer(false);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_ACCOUNT_RULES:
+		case AccountManager::WINDOW_PRIVATE_ACCOUNT_RULES:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_ACCOUNT_NAME, "");
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(common ? AccountManager::WINDOW_COMMON_LOGIN : AccountManager::WINDOW_PRIVATE_MENU));
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_RULES:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RULES:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD, "");
+			} else {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_ACCOUNT_NAME, "");
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_CONFIRM:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_CONFIRM:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_CONFIRM, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_RULES:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_EMAIL, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_CONFIRM, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_EMAIL, "");
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_RULES));
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_CODE:
+		case AccountManager::WINDOW_COMMON_EMAIL_CODE_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_EMAIL_CODE, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				const std::string code = AccountManager::generateEmailCode();
+				player->setTempEmailCode(code);
+				player->setTempEmailCodeExpiresAt(time(nullptr) + ACCOUNT_MANAGER_EMAIL_CODE_TTL);
+				if (AccountManager::sendEmailCode(player->getTempEmail(), "Codigo de criacao da conta", code)) {
+					player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_CODE));
+				} else {
+					player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_SEND_FAILED));
+				}
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_EMAIL_SEND_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_RULES));
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_SUCCESS:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_SUCCESS:
+			player->kickPlayer(false);
+			break;
+		case AccountManager::WINDOW_COMMON_ACCOUNT_FAILED:
+		case AccountManager::WINDOW_PRIVATE_ACCOUNT_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_ACCOUNT_NAME, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_FAILED:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_PASSWORD_MISMATCH:
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_MISMATCH:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_CONFIRM, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->setTempPassword("");
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_ACCOUNT:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_RECOVERY_ACCOUNT, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_EMAIL:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_RECOVERY_EMAIL, "");
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_ACCOUNT));
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_ACCOUNT));
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_CODE:
+		case AccountManager::WINDOW_COMMON_RECOVERY_CODE_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_RECOVERY_CODE, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				const std::string code = AccountManager::generateEmailCode();
+				player->setTempEmailCode(code);
+				player->setTempEmailCodeExpiresAt(time(nullptr) + ACCOUNT_MANAGER_EMAIL_CODE_TTL);
+				if (AccountManager::sendEmailCode(player->getTempEmail(), "Codigo de recuperacao de senha", code)) {
+					player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_CODE));
+				} else {
+					player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_SEND_FAILED));
+				}
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_SEND_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_EMAIL));
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_CONFIRM:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET_CONFIRM, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_MISMATCH:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET_CONFIRM, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->setTempPassword("");
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_COMMON_RECOVERY_SUCCESS:
+			player->kickPlayer(false);
+			break;
+		case AccountManager::WINDOW_PRIVATE_MENU:
+			if (button == AccountManager::BUTTON_SECONDARY) {
+				player->kickPlayer(false);
+			} else if (choice == AccountManager::CHOICE_FIRST) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_OPTION));
+			} else if (choice == AccountManager::CHOICE_SECOND) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_ACCOUNT_RULES));
+			} else if (choice == AccountManager::CHOICE_THIRD) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_PASSWORD_RESET));
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_OPTION:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->setTempCharacterOption(choice);
+				if (const auto* option = AccountManager::getCharacterOption(choice)) {
+					if (!option->towns.empty()) {
+						player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_TOWN, choice));
+					} else if (option->useSpawnPosition) {
+						player->setTempPosition(option->spawnPosition);
+						player->sendModalWindow(createAccountManagerWindow(option->chooseElement ? AccountManager::WINDOW_PRIVATE_CHARACTER_ELEMENT : AccountManager::WINDOW_PRIVATE_CHARACTER_NAME));
+					}
+				}
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_TOWN:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				if (Town* town = map.towns.getTown(choice)) {
+					player->setTempTownId(choice);
+					player->setTempPosition(town->getTemplePosition());
+					const auto* option = AccountManager::getCharacterOption(player->getTempCharacterOption());
+					player->sendModalWindow(createAccountManagerWindow(option && option->chooseElement ? AccountManager::WINDOW_PRIVATE_CHARACTER_ELEMENT : AccountManager::WINDOW_PRIVATE_CHARACTER_NAME));
+				}
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_OPTION));
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_ELEMENT:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->setTempElementId(choice);
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_NAME));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_TOWN, player->getTempCharacterOption()));
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_NAME:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_CHARACTER_NAME, "");
+			} else {
+				const auto* option = AccountManager::getCharacterOption(player->getTempCharacterOption());
+				player->sendModalWindow(createAccountManagerWindow(option && option->chooseElement ? AccountManager::WINDOW_PRIVATE_CHARACTER_ELEMENT : AccountManager::WINDOW_PRIVATE_CHARACTER_TOWN, player->getTempCharacterOption()));
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_SUCCESS:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				doAccountManagerLogin(player);
+			} else {
+				player->kickPlayer(false);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_CHARACTER_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_CHARACTER_NAME, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_CONFIRM:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET_CONFIRM, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_SUCCESS:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				doAccountManagerLogin(player);
+			} else {
+				player->kickPlayer(false);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_FAILED:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+		case AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_MISMATCH:
+			if (button == AccountManager::BUTTON_PRIMARY) {
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET_CONFIRM, "");
+			} else if (button == AccountManager::BUTTON_SECONDARY) {
+				player->setTempPassword("");
+				player->sendAccountManagerTextWindow(AccountManager::TEXT_PASSWORD_RESET, "");
+			} else {
+				doAccountManagerLogin(player);
+			}
+			break;
+	}
+}
+
+void Game::onAccountManagerReceiveText(uint32_t playerId, uint32_t windowId, const std::string& text)
+{
+	Player* player = getPlayerByID(playerId);
+	if (!player) {
+		return;
+	}
+
+	Database& db = Database::getInstance();
+	switch (windowId) {
+		case AccountManager::TEXT_ACCOUNT_NAME:
+			if (AccountManager::isValidRegistrationText(text) && !IOLoginData::accountExists(text)) {
+				player->setTempAccountName(text);
+				player->sendModalWindow(createAccountManagerWindow(player->getAccount() == AccountManager::AccountId ? AccountManager::WINDOW_COMMON_PASSWORD_RULES : AccountManager::WINDOW_PRIVATE_PASSWORD_RULES));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(player->getAccount() == AccountManager::AccountId ? AccountManager::WINDOW_COMMON_ACCOUNT_FAILED : AccountManager::WINDOW_PRIVATE_ACCOUNT_FAILED));
+			}
+			break;
+		case AccountManager::TEXT_PASSWORD:
+			if (AccountManager::isValidRegistrationText(text)) {
+				player->setTempPassword(text);
+				player->sendModalWindow(createAccountManagerWindow(player->getAccount() == AccountManager::AccountId ? AccountManager::WINDOW_COMMON_PASSWORD_CONFIRM : AccountManager::WINDOW_PRIVATE_PASSWORD_CONFIRM));
+			} else {
+				player->setTempPassword("");
+				player->sendModalWindow(createAccountManagerWindow(player->getAccount() == AccountManager::AccountId ? AccountManager::WINDOW_COMMON_PASSWORD_FAILED : AccountManager::WINDOW_PRIVATE_PASSWORD_FAILED));
+			}
+			break;
+		case AccountManager::TEXT_PASSWORD_CONFIRM:
+			if (text == player->getTempPassword()) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_RULES));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(player->getAccount() == AccountManager::AccountId ? AccountManager::WINDOW_COMMON_PASSWORD_MISMATCH : AccountManager::WINDOW_PRIVATE_PASSWORD_MISMATCH));
+			}
+			break;
+		case AccountManager::TEXT_EMAIL: {
+			if (!AccountManager::isValidEmail(text) || accountManagerEmailInUse(text)) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_FAILED));
+				break;
+			}
+
+			const std::string code = AccountManager::generateEmailCode();
+			player->setTempEmail(text);
+			player->setTempEmailCode(code);
+			player->setTempEmailCodeExpiresAt(time(nullptr) + ACCOUNT_MANAGER_EMAIL_CODE_TTL);
+			if (AccountManager::sendEmailCode(text, "Codigo de criacao da conta", code)) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_CODE));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_SEND_FAILED));
+			}
+			break;
+		}
+		case AccountManager::TEXT_EMAIL_CODE:
+			if (isAccountManagerCodeValid(player, text)) {
+				const bool created = db.executeQuery(fmt::format(
+				    "INSERT INTO `accounts` (`name`, `password`, `secret`, `type`, `premium_ends_at`, `email`, `email_verified`, `creation`) VALUES ({:s}, HEX({:s}), NULL, 1, 0, {:s}, 1, UNIX_TIMESTAMP())",
+				    db.escapeString(player->getTempAccountName()), db.escapeString(transformToSHA1(player->getTempPassword())), db.escapeString(player->getTempEmail())));
+				player->setTempAccountName("");
+				player->setTempPassword("");
+				player->setTempEmail("");
+				player->setTempEmailCode("");
+				player->setTempEmailCodeExpiresAt(0);
+				player->sendModalWindow(createAccountManagerWindow(created ? (player->getAccount() == AccountManager::AccountId ? AccountManager::WINDOW_COMMON_SUCCESS : AccountManager::WINDOW_PRIVATE_PASSWORD_SUCCESS) : AccountManager::WINDOW_COMMON_ACCOUNT_FAILED));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_EMAIL_CODE_FAILED));
+			}
+			break;
+		case AccountManager::TEXT_CHARACTER_NAME: {
+			if (!AccountManager::isValidCharacterName(text) || IOLoginData::getGuidByName(text) != 0) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_FAILED));
+				break;
+			}
+
+			const auto* option = AccountManager::getCharacterOption(player->getTempCharacterOption());
+			Vocation* vocation = option ? g_vocations.getVocation(option->vocation) : nullptr;
+			if (!option || !vocation) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_PRIVATE_CHARACTER_FAILED));
+				break;
+			}
+
+			const Position& pos = player->getTempPosition();
+			const uint16_t elementId = option->chooseElement ? player->getTempElementId() : option->element;
+			const bool created = db.executeQuery(fmt::format(
+			    "INSERT INTO `players` (`account_id`, `name`, `vocation`, `element`, `maglevel`, `sex`, `looktype`, `lookhead`, `lookbody`, `looklegs`, `lookfeet`, `lookaddons`, `currentmount`, `skill_fist`, `skill_fist_tries`, `skill_club`, `skill_club_tries`, `skill_sword`, `skill_sword_tries`, `skill_axe`, `skill_axe_tries`, `skill_dist`, `skill_dist_tries`, `skill_shielding`, `skill_shielding_tries`, `skill_fishing`, `skill_fishing_tries`, `town_id`, `posx`, `posy`, `posz`) VALUES ({:d}, {:s}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d})",
+			    player->getAccount(), db.escapeString(text), option->vocation, elementId, option->magicLevel, option->sex ? 1 : 0,
+			    option->outfit[0], option->outfit[1], option->outfit[2], option->outfit[3], option->outfit[4], option->outfit[5], option->outfit[6],
+			    option->skills[SKILL_FIST], vocation->getReqSkillTries(SKILL_FIST, option->skills[SKILL_FIST]),
+			    option->skills[SKILL_CLUB], vocation->getReqSkillTries(SKILL_CLUB, option->skills[SKILL_CLUB]),
+			    option->skills[SKILL_SWORD], vocation->getReqSkillTries(SKILL_SWORD, option->skills[SKILL_SWORD]),
+			    option->skills[SKILL_AXE], vocation->getReqSkillTries(SKILL_AXE, option->skills[SKILL_AXE]),
+			    option->skills[SKILL_DISTANCE], vocation->getReqSkillTries(SKILL_DISTANCE, option->skills[SKILL_DISTANCE]),
+			    option->skills[SKILL_SHIELD], vocation->getReqSkillTries(SKILL_SHIELD, option->skills[SKILL_SHIELD]),
+			    option->skills[SKILL_FISHING], vocation->getReqSkillTries(SKILL_FISHING, option->skills[SKILL_FISHING]),
+			    player->getTempTownId(), pos.x, pos.y, pos.z));
+
+			player->sendModalWindow(createAccountManagerWindow(created ? AccountManager::WINDOW_PRIVATE_CHARACTER_SUCCESS : AccountManager::WINDOW_PRIVATE_CHARACTER_FAILED));
+			break;
+		}
+		case AccountManager::TEXT_PASSWORD_RESET:
+			if (AccountManager::isValidRegistrationText(text)) {
+				player->setTempPassword(text);
+				player->sendModalWindow(createAccountManagerWindow(player->getTempRecoveryAccountId() != 0 ? AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_CONFIRM : AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_CONFIRM));
+			} else {
+				player->setTempPassword("");
+				player->sendModalWindow(createAccountManagerWindow(player->getTempRecoveryAccountId() != 0 ? AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_FAILED : AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_FAILED));
+			}
+			break;
+		case AccountManager::TEXT_PASSWORD_RESET_CONFIRM:
+			if (text == player->getTempPassword()) {
+				const uint32_t accountId = player->getTempRecoveryAccountId() != 0 ? player->getTempRecoveryAccountId() : player->getAccount();
+				const bool changed = db.executeQuery(fmt::format("UPDATE `accounts` SET `password` = HEX({:s}) WHERE `id` = {:d}", db.escapeString(transformToSHA1(text)), accountId));
+				player->setTempPassword("");
+				if (player->getTempRecoveryAccountId() != 0) {
+					player->setTempRecoveryAccountId(0);
+					player->setTempEmail("");
+					player->setTempEmailCode("");
+					player->setTempEmailCodeExpiresAt(0);
+					player->sendModalWindow(createAccountManagerWindow(changed ? AccountManager::WINDOW_COMMON_RECOVERY_SUCCESS : AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_FAILED));
+				} else {
+					player->sendModalWindow(createAccountManagerWindow(changed ? AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_SUCCESS : AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_FAILED));
+				}
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(player->getTempRecoveryAccountId() != 0 ? AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD_MISMATCH : AccountManager::WINDOW_PRIVATE_PASSWORD_RESET_MISMATCH));
+			}
+			break;
+		case AccountManager::TEXT_RECOVERY_ACCOUNT:
+			if (AccountManager::isValidRegistrationText(text) && IOLoginData::accountExists(text)) {
+				player->setTempAccountName(text);
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_EMAIL));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_FAILED));
+			}
+			break;
+		case AccountManager::TEXT_RECOVERY_EMAIL: {
+			if (!AccountManager::isValidEmail(text)) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_FAILED));
+				break;
+			}
+
+			const uint32_t accountId = getRecoveryAccountId(player->getTempAccountName(), text);
+			if (accountId == 0) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_FAILED));
+				break;
+			}
+
+			const std::string code = AccountManager::generateEmailCode();
+			player->setTempEmail(text);
+			player->setTempEmailCode(code);
+			player->setTempEmailCodeExpiresAt(time(nullptr) + ACCOUNT_MANAGER_EMAIL_CODE_TTL);
+			player->setTempRecoveryAccountId(accountId);
+			if (AccountManager::sendEmailCode(text, "Codigo de recuperacao de senha", code)) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_CODE));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_SEND_FAILED));
+			}
+			break;
+		}
+		case AccountManager::TEXT_RECOVERY_CODE:
+			if (isAccountManagerCodeValid(player, text) && player->getTempRecoveryAccountId() != 0) {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_PASSWORD));
+			} else {
+				player->sendModalWindow(createAccountManagerWindow(AccountManager::WINDOW_COMMON_RECOVERY_CODE_FAILED));
+			}
+			break;
+	}
+}
+
 void Game::playerAnswerModalWindow(uint32_t playerId, uint32_t modalWindowId, uint8_t button, uint8_t choice) {
 	Player* player = getPlayerByID(playerId);
 	if (!player) {
@@ -5541,6 +6311,12 @@ void Game::playerAnswerModalWindow(uint32_t playerId, uint32_t modalWindowId, ui
 	}
 
 	if (!player->hasModalWindowOpen(modalWindowId)) {
+		return;
+	}
+
+	if (player->isAccountManager()) {
+		player->onModalWindowHandled(modalWindowId);
+		onAccountManagerInput(player, modalWindowId, button, choice);
 		return;
 	}
 

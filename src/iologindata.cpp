@@ -3,6 +3,7 @@
 
 #include "otpch.h"
 
+#include "accountmanager.h"
 #include "iologindata.h"
 
 #include "condition.h"
@@ -75,6 +76,24 @@ std::pair<uint32_t, std::string> IOLoginData::gameworldAuthentication(std::strin
 	}
 
 	return std::make_pair(accountId, std::string{result->getString("name")});
+}
+
+std::pair<uint32_t, std::string> IOLoginData::accountManagerAuthentication(std::string_view accountName, std::string_view password)
+{
+	Database& db = Database::getInstance();
+
+	DBResult_ptr result = db.storeQuery(fmt::format("SELECT `id`, UNHEX(`password`) AS `password` FROM `accounts` WHERE `name` = {:s}", db.escapeString(accountName)));
+	if (!result || transformToSHA1(password) != result->getString("password")) {
+		return {};
+	}
+
+	const uint32_t accountId = result->getNumber<uint32_t>("id");
+	result = db.storeQuery(fmt::format("SELECT `name` FROM `players` WHERE `id` = {:d} AND `name` = {:s} AND `deletion` = 0", AccountManager::PlayerId, db.escapeString(AccountManager::Name)));
+	if (!result) {
+		return {};
+	}
+
+	return {accountId, std::string{result->getString("name")}};
 }
 
 uint32_t IOLoginData::getAccountIdByPlayerName(const std::string& playerName) {
@@ -959,4 +978,10 @@ void IOLoginData::removeVIPEntry(uint32_t accountId, uint32_t guid) {
 
 void IOLoginData::updatePremiumTime(uint32_t accountId, time_t endTime) {
 	Database::getInstance().executeQuery(fmt::format("UPDATE `accounts` SET `premium_ends_at` = {:d} WHERE `id` = {:d}", endTime, accountId));
+}
+
+bool IOLoginData::accountExists(const std::string& accountName)
+{
+	Database& db = Database::getInstance();
+	return db.storeQuery(fmt::format("SELECT 1 FROM `accounts` WHERE `name` = {:s} LIMIT 1", db.escapeString(accountName))).get() != nullptr;
 }

@@ -3,6 +3,7 @@
 
 #include "otpch.h"
 
+#include "accountmanager.h"
 #include "protocollogin.h"
 
 #include "ban.h"
@@ -75,6 +76,10 @@ void ProtocolLogin::getCharacterList(const std::string& accountName, const std::
 	auto premiumEndsAt = result->getNumber<time_t>("premium_ends_at");
 
 	std::vector<std::string> characters = {};
+	if (AccountManager::isEnabled() && id != AccountManager::AccountId) {
+		characters.emplace_back(AccountManager::Name);
+	}
+
 	result = db.storeQuery(fmt::format("SELECT `name` FROM `players` WHERE `account_id` = {:d} AND `deletion` = 0 ORDER BY `name` ASC", id));
 	if (result) {
 		do {
@@ -223,13 +228,15 @@ void ProtocolLogin::onRecvFirstMessage(NetworkMessage& msg) {
 	}
 
 	auto accountName = msg.getString();
-	if (accountName.empty()) {
+	auto password = msg.getString();
+
+	if (accountName.empty() && password.empty() && AccountManager::isEnabled() && AccountManager::allowNoPasswordLogin()) {
+		accountName = AccountManager::getAuthPassword();
+		password = AccountManager::getAuthPassword();
+	} else if (accountName.empty()) {
 		disconnectClient("Invalid account name.", version);
 		return;
-	}
-
-	auto password = msg.getString();
-	if (password.empty()) {
+	} else if (password.empty()) {
 		disconnectClient("Invalid password.", version);
 		return;
 	}
