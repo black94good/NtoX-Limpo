@@ -75,6 +75,7 @@ namespace ConfigManager {
 		SMTP_FROM,
 		SMTP_FROM_NAME,
 		CONFIG_FILE,
+		ASSETS_DAT_PATH,
 
 		LAST_STRING_CONFIG /* this must be the last one */
 	};

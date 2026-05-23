@@ -158,12 +158,10 @@ namespace {
 
 		// load item data
 		std::cout << ">> Loading items... ";
-		if (!Item::items.loadFromOtb("data/items/items.otb")) {
-			startupErrorMessage("Unable to load items (OTB)!");
+		if (!Item::items.loadFromDat(getString(ConfigManager::ASSETS_DAT_PATH))) {
+			startupErrorMessage("Unable to load items (DAT)! Copy 'Tibia.dat' from your client folder, rename it to 'assets.dat' and place it in 'data/items/'.");
 			return;
 		}
-
-		std::cout << fmt::format("OTB v{:d}.{:d}.{:d}", Item::items.majorVersion, Item::items.minorVersion, Item::items.buildNumber) << std::endl;
 
 		if (!Item::items.loadFromXml()) {
 			startupErrorMessage("Unable to load items (XML)!");

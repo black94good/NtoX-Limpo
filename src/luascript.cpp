@@ -2119,6 +2119,7 @@ void LuaScriptInterface::registerFunctions() {
 	registerEnumIn(L, "configKeys", ConfigManager::MYSQL_SOCK)
 	registerEnumIn(L, "configKeys", ConfigManager::DEFAULT_PRIORITY)
 	registerEnumIn(L, "configKeys", ConfigManager::MAP_AUTHOR)
+	registerEnumIn(L, "configKeys", ConfigManager::ASSETS_DAT_PATH)
 
 	registerEnumIn(L, "configKeys", ConfigManager::SQL_PORT)
 	registerEnumIn(L, "configKeys", ConfigManager::MAX_PLAYERS)

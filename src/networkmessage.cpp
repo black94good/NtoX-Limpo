@@ -76,7 +76,7 @@ void NetworkMessage::addPosition(const Position& pos) {
 }
 
 void NetworkMessage::addItem(uint16_t id, uint8_t count) {
-	const ItemType& it = Item::items[id];
+	const ItemType& it = Item::items.getNetworkItemType(id);
 
 	add<uint16_t>(it.clientId);
 
@@ -94,7 +94,7 @@ void NetworkMessage::addItem(uint16_t id, uint8_t count) {
 }
 
 void NetworkMessage::addItem(const Item* item) {
-	const ItemType& it = Item::items[item->getID()];
+	const ItemType& it = Item::items.getNetworkItemType(item->getID());
 
 	add<uint16_t>(it.clientId);
 	addByte(0xFF); // MARK_UNMARKED
@@ -111,5 +111,5 @@ void NetworkMessage::addItem(const Item* item) {
 }
 
 void NetworkMessage::addItemId(uint16_t itemId) {
-	add<uint16_t>(Item::items[itemId].clientId);
+	add<uint16_t>(Item::items.getNetworkItemType(itemId).clientId);
 }

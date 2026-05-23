@@ -819,7 +819,7 @@ class Item : virtual public Thing {
 			return id;
 		}
 		uint16_t getClientID() const {
-			return items[id].clientId;
+			return items.getNetworkItemType(id).clientId;
 		}
 		void setID(uint16_t newid);
 

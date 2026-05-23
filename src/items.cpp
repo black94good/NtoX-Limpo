@@ -5,9 +5,12 @@
 
 #include "items.h"
 
+#include "configmanager.h"
 #include "movement.h"
 #include "pugicast.h"
 #include "weapons.h"
+
+#include <fstream>
 
 extern MoveEvents* g_moveEvents;
 extern Weapons* g_weapons;
@@ -279,7 +282,6 @@ Items::Items() {
 
 void Items::clear() {
 	items.clear();
-	clientIdToServerIdMap.clear();
 	nameToItems.clear();
 	currencyItems.clear();
 	inventory.clear();
@@ -287,7 +289,9 @@ void Items::clear() {
 
 bool Items::reload() {
 	clear();
-	loadFromOtb("data/items/items.otb");
+	if (!loadFromDat(getString(ConfigManager::ASSETS_DAT_PATH))) {
+		return false;
+	}
 
 	if (!loadFromXml()) {
 		return false;
@@ -299,238 +303,44 @@ bool Items::reload() {
 	return true;
 }
 
-constexpr auto OTBI = OTB::Identifier{{'O','T', 'B', 'I'}};
+bool Items::loadFromDat(std::string_view file)
+{
+	majorVersion = 3;
+	minorVersion = CLIENT_VERSION_1098;
+	buildNumber = 0;
 
-bool Items::loadFromOtb(const std::string& file) {
-	OTB::Loader loader{file, OTBI};
-
-	auto& root = loader.parseTree();
-
-	PropStream props;
-	if (loader.getProps(root, props)) {
-		//4 byte flags
-		//attributes
-		//0x01 = version data
-		uint32_t flags;
-		if (!props.read<uint32_t>(flags)) {
-			return false;
-		}
-
-		uint8_t attr;
-		if (!props.read<uint8_t>(attr)) {
-			return false;
-		}
-
-		if (attr == ROOT_ATTR_VERSION) {
-			uint16_t datalen;
-			if (!props.read<uint16_t>(datalen)) {
-				return false;
-			}
-
-			if (datalen != sizeof(VERSIONINFO)) {
-				return false;
-			}
-
-			VERSIONINFO vi;
-			if (!props.read(vi)) {
-				return false;
-			}
-
-			majorVersion = vi.dwMajorVersion; //items otb format file version
-			minorVersion = vi.dwMinorVersion; //client version
-			buildNumber = vi.dwBuildNumber; //revision
-		}
-	}
-
-	if (majorVersion == 0xFFFFFFFF) {
-		std::cout << "[Warning - Items::loadFromOtb] items.otb using generic client version." << std::endl;
-	} else if (majorVersion != 3) {
-		std::cout << "Old version detected, a newer version of items.otb is required." << std::endl;
-		return false;
-	} else if (minorVersion < CLIENT_VERSION_1098) {
-		std::cout << "A newer version of items.otb is required." << std::endl;
+	std::ifstream fin(std::string{file}, std::ios::binary | std::ios::ate);
+	if (!fin.is_open()) {
+		std::cout << "[Error - Items::loadFromDat] Unable to load assets.dat from path: " << file << std::endl;
+		std::cout << "[Error - Items::loadFromDat] Copy 'Tibia.dat' from your client folder, rename it to 'assets.dat' and place it in 'data/items/'." << std::endl;
 		return false;
 	}
 
-	for (auto& itemNode : root.children) {
-		PropStream stream;
-		if (!loader.getProps(itemNode, stream)) {
+	auto fileSize = static_cast<size_t>(fin.tellg());
+	fin.seekg(0, std::ios::beg);
+
+	std::vector<uint8_t> buf(fileSize);
+	fin.read(reinterpret_cast<char*>(buf.data()), fileSize);
+	fin.close();
+
+	size_t pos = 4;
+
+	uint16_t itemCount = 0;
+	std::memcpy(&itemCount, &buf[pos], sizeof(itemCount));
+	pos += sizeof(itemCount);
+
+	pos += 6;
+
+	items.resize(itemCount + 1);
+
+	const bool extendedSprites = true;
+	for (uint16_t id = 100; id < items.size(); ++id) {
+		ItemType& iType = items[id];
+		iType.clientId = id;
+		iType.id = id;
+		if (!unserializeDatItem(iType, buf.data(), pos, fileSize, extendedSprites)) {
 			return false;
 		}
-
-		uint32_t flags;
-		if (!stream.read<uint32_t>(flags)) {
-			return false;
-		}
-
-		uint16_t serverId = 0;
-		uint16_t clientId = 0;
-		uint16_t speed = 0;
-		uint16_t wareId = 0;
-		uint8_t lightLevel = 0;
-		uint8_t lightColor = 0;
-		uint8_t alwaysOnTopOrder = 0;
-
-		uint8_t attrib;
-		while (stream.read<uint8_t>(attrib)) {
-			uint16_t datalen;
-			if (!stream.read<uint16_t>(datalen)) {
-				return false;
-			}
-
-			switch (attrib) {
-				case ITEM_ATTR_SERVERID: {
-					if (datalen != sizeof(uint16_t)) {
-						return false;
-					}
-
-					if (!stream.read<uint16_t>(serverId)) {
-						return false;
-					}
-					break;
-				}
-
-				case ITEM_ATTR_CLIENTID: {
-					if (datalen != sizeof(uint16_t)) {
-						return false;
-					}
-
-					if (!stream.read<uint16_t>(clientId)) {
-						return false;
-					}
-					break;
-				}
-
-				case ITEM_ATTR_SPEED: {
-					if (datalen != sizeof(uint16_t)) {
-						return false;
-					}
-
-					if (!stream.read<uint16_t>(speed)) {
-						return false;
-					}
-					break;
-				}
-
-				case ITEM_ATTR_LIGHT2: {
-					if (datalen != sizeof(lightBlock2)) {
-						return false;
-					}
-
-					lightBlock2 lb2;
-					if (!stream.read(lb2)) {
-						return false;
-					}
-
-					lightLevel = static_cast<uint8_t>(lb2.lightLevel);
-					lightColor = static_cast<uint8_t>(lb2.lightColor);
-					break;
-				}
-
-				case ITEM_ATTR_TOPORDER: {
-					if (datalen != sizeof(uint8_t)) {
-						return false;
-					}
-
-					if (!stream.read<uint8_t>(alwaysOnTopOrder)) {
-						return false;
-					}
-					break;
-				}
-
-				case ITEM_ATTR_WAREID: {
-					if (datalen != sizeof(uint16_t)) {
-						return false;
-					}
-
-					if (!stream.read<uint16_t>(wareId)) {
-						return false;
-					}
-					break;
-				}
-
-				case ITEM_ATTR_CLASSIFICATION: {
-					if (!stream.skip(1)) {
-						return false;
-					}
-					break;
-				}
-
-				default: {
-					//skip unknown attributes
-					if (!stream.skip(datalen)) {
-						return false;
-					}
-					break;
-				}
-			}
-		}
-
-		clientIdToServerIdMap.emplace(clientId, serverId);
-
-		// store the found item
-		if (serverId >= items.size()) {
-			items.resize(serverId + 1);
-		}
-		ItemType& iType = items[serverId];
-
-		iType.group = static_cast<itemgroup_t>(itemNode.type);
-		switch (itemNode.type) {
-			case ITEM_GROUP_CONTAINER:
-				iType.type = ITEM_TYPE_CONTAINER;
-				break;
-			case ITEM_GROUP_DOOR:
-				//not used
-				iType.type = ITEM_TYPE_DOOR;
-				break;
-			case ITEM_GROUP_MAGICFIELD:
-				//not used
-				iType.type = ITEM_TYPE_MAGICFIELD;
-				break;
-			case ITEM_GROUP_TELEPORT:
-				//not used
-				iType.type = ITEM_TYPE_TELEPORT;
-				break;
-			case ITEM_GROUP_NONE:
-			case ITEM_GROUP_GROUND:
-			case ITEM_GROUP_SPLASH:
-			case ITEM_GROUP_FLUID:
-			case ITEM_GROUP_CHARGES:
-			case ITEM_GROUP_DEPRECATED:
-			case ITEM_GROUP_PODIUM:
-				break;
-			default:
-				return false;
-		}
-
-		iType.blockSolid = hasBitSet(FLAG_BLOCK_SOLID, flags);
-		iType.blockProjectile = hasBitSet(FLAG_BLOCK_PROJECTILE, flags);
-		iType.blockPathFind = hasBitSet(FLAG_BLOCK_PATHFIND, flags);
-		iType.hasHeight = hasBitSet(FLAG_HAS_HEIGHT, flags);
-		iType.useable = hasBitSet(FLAG_USEABLE, flags);
-		iType.pickupable = hasBitSet(FLAG_PICKUPABLE, flags);
-		iType.moveable = hasBitSet(FLAG_MOVEABLE, flags);
-		iType.stackable = hasBitSet(FLAG_STACKABLE, flags);
-
-		iType.alwaysOnTop = hasBitSet(FLAG_ALWAYSONTOP, flags);
-		iType.isVertical = hasBitSet(FLAG_VERTICAL, flags);
-		iType.isHorizontal = hasBitSet(FLAG_HORIZONTAL, flags);
-		iType.isHangable = hasBitSet(FLAG_HANGABLE, flags);
-		iType.allowDistRead = hasBitSet(FLAG_ALLOWDISTREAD, flags);
-		iType.rotatable = hasBitSet(FLAG_ROTATABLE, flags);
-		iType.canReadText = hasBitSet(FLAG_READABLE, flags);
-		iType.lookThrough = hasBitSet(FLAG_LOOKTHROUGH, flags);
-		iType.isAnimation = hasBitSet(FLAG_ANIMATION, flags);
-		// iType.walkStack = !hasBitSet(FLAG_FULLTILE, flags);
-		iType.forceUse = hasBitSet(FLAG_FORCEUSE, flags);
-
-		iType.id = serverId;
-		iType.clientId = clientId;
-		iType.speed = speed;
-		iType.lightLevel = lightLevel;
-		iType.lightColor = lightColor;
-		iType.wareId = wareId;
-		iType.alwaysOnTopOrder = alwaysOnTopOrder;
 	}
 
 	items.shrink_to_fit();
@@ -1536,6 +1346,22 @@ ItemType& Items::getItemType(size_t id) {
 	return items.front();
 }
 
+bool Items::hasItemType(size_t id) const {
+	return id < items.size() && items[id].id != 0 && items[id].clientId != 0;
+}
+
+const ItemType& Items::getNetworkItemType(size_t id) const {
+	if (hasItemType(id)) {
+		return items[id];
+	}
+
+	if (hasItemType(ITEM_BAG)) {
+		return items[ITEM_BAG];
+	}
+
+	return items.front();
+}
+
 const ItemType& Items::getItemType(size_t id) const {
 	if (id < items.size()) {
 		return items[id];
@@ -1544,12 +1370,308 @@ const ItemType& Items::getItemType(size_t id) const {
 }
 
 const ItemType& Items::getItemIdByClientId(uint16_t spriteId) const {
-	if (spriteId >= 100) {
-		if (uint16_t serverId = clientIdToServerIdMap.getServerId(spriteId)) {
-			return getItemType(serverId);
-		}
+	if (spriteId >= 100 && hasItemType(spriteId)) {
+		return getItemType(spriteId);
 	}
 	return items.front();
+}
+
+bool Items::unserializeDatItem(ItemType& iType, const uint8_t* buf, size_t& pos, size_t bufSize, bool extendedSprites)
+{
+	auto readUint16 = [buf, bufSize](size_t& cursor, uint16_t& value) -> bool {
+		if (cursor + sizeof(uint16_t) > bufSize) {
+			return false;
+		}
+
+		std::memcpy(&value, &buf[cursor], sizeof(uint16_t));
+		cursor += sizeof(uint16_t);
+		return true;
+	};
+
+	auto skipBytes = [bufSize](size_t& cursor, size_t amount) -> bool {
+		if (cursor + amount > bufSize) {
+			return false;
+		}
+
+		cursor += amount;
+		return true;
+	};
+
+	auto remapAttr = [](uint8_t rawAttr) -> uint16_t {
+		if (rawAttr == 16) {
+			return 253;
+		}
+		if (rawAttr == 254) {
+			return 34;
+		}
+		if (rawAttr == 35) {
+			return 251;
+		}
+		if (rawAttr > 16) {
+			return rawAttr - 1;
+		}
+		return rawAttr;
+	};
+
+	uint8_t rawFlag;
+	do {
+		if (pos >= bufSize) {
+			return false;
+		}
+
+		rawFlag = buf[pos++];
+		if (rawFlag == 0xFF) {
+			break;
+		}
+
+		switch (remapAttr(rawFlag)) {
+			case 0: {
+				iType.group = ITEM_GROUP_GROUND;
+				uint16_t groundSpeed = 0;
+				if (!readUint16(pos, groundSpeed)) {
+					return false;
+				}
+				iType.speed = groundSpeed;
+				break;
+			}
+
+			case 1:
+				iType.alwaysOnTopOrder = 1;
+				break;
+
+			case 2:
+				iType.alwaysOnTopOrder = 2;
+				break;
+
+			case 3:
+				iType.alwaysOnTopOrder = 3;
+				break;
+
+			case 4:
+				iType.group = ITEM_GROUP_CONTAINER;
+				iType.type = ITEM_TYPE_CONTAINER;
+				break;
+
+			case 5:
+				iType.stackable = true;
+				break;
+
+			case 6:
+				iType.forceUse = true;
+				break;
+
+			case 7:
+				iType.useable = true;
+				break;
+
+			case 8: {
+				iType.canWriteText = true;
+				iType.canReadText = true;
+				uint16_t maxTextLen = 0;
+				if (!readUint16(pos, maxTextLen)) {
+					return false;
+				}
+				iType.maxTextLen = maxTextLen;
+				break;
+			}
+
+			case 9: {
+				iType.canReadText = true;
+				uint16_t maxTextLen = 0;
+				if (!readUint16(pos, maxTextLen)) {
+					return false;
+				}
+				iType.maxTextLen = maxTextLen;
+				break;
+			}
+
+			case 10:
+				iType.group = ITEM_GROUP_FLUID;
+				break;
+
+			case 11:
+				iType.group = ITEM_GROUP_SPLASH;
+				break;
+
+			case 12:
+				iType.blockSolid = true;
+				break;
+
+			case 13:
+				iType.moveable = false;
+				break;
+
+			case 14:
+				iType.blockProjectile = true;
+				break;
+
+			case 15:
+				iType.blockPathFind = true;
+				break;
+
+			case 16:
+				iType.pickupable = true;
+				break;
+
+			case 17:
+				iType.isHangable = true;
+				break;
+
+			case 18:
+				iType.isHangable = true;
+				iType.isHorizontal = true;
+				break;
+
+			case 19:
+				iType.isHangable = true;
+				iType.isVertical = true;
+				break;
+
+			case 20:
+				iType.rotatable = true;
+				break;
+
+			case 21: {
+				uint16_t lightLevel = 0;
+				uint16_t lightColor = 0;
+				if (!readUint16(pos, lightLevel) || !readUint16(pos, lightColor)) {
+					return false;
+				}
+				iType.lightLevel = lightLevel;
+				iType.lightColor = lightColor;
+				break;
+			}
+
+			case 22:
+			case 23:
+			case 26:
+			case 27:
+			case 30:
+				break;
+
+			case 24:
+				if (!skipBytes(pos, 4)) {
+					return false;
+				}
+				break;
+
+			case 25:
+				iType.hasHeight = true;
+				if (!skipBytes(pos, 2)) {
+					return false;
+				}
+				break;
+
+			case 28:
+				if (!skipBytes(pos, 2)) {
+					return false;
+				}
+				break;
+
+			case 29: {
+				uint16_t lensHelp = 0;
+				if (!readUint16(pos, lensHelp)) {
+					return false;
+				}
+				if (lensHelp == 1112) {
+					iType.canReadText = true;
+				}
+				break;
+			}
+
+			case 31:
+				iType.lookThrough = true;
+				break;
+
+			case 32:
+				if (!skipBytes(pos, 2)) {
+					return false;
+				}
+				break;
+
+			case 33:
+				iType.wareId = iType.id;
+				if (!skipBytes(pos, 6)) {
+					return false;
+				}
+				{
+					uint16_t nameLen = 0;
+					if (!readUint16(pos, nameLen) || !skipBytes(pos, static_cast<size_t>(nameLen) + 4)) {
+						return false;
+					}
+				}
+				break;
+
+			case 34: {
+				uint16_t usable = 0;
+				if (!readUint16(pos, usable)) {
+					return false;
+				}
+				iType.useable = (usable != 0);
+				break;
+			}
+
+			case 35:
+			case 36:
+			case 37:
+			case 38:
+			case 39:
+			case 40:
+			case 41:
+			case 42:
+			case 43:
+			case 44:
+			case 253:
+				break;
+
+			case 251:
+				if (!skipBytes(pos, 2)) {
+					return false;
+				}
+				break;
+
+			default: {
+				std::cout << "[Error - Items::unserializeDatItem] Unknown flag " << static_cast<uint32_t>(rawFlag)
+					<< " (mapped to " << remapAttr(rawFlag) << ") at id " << iType.id << std::endl;
+				return false;
+			}
+		}
+	} while (rawFlag != 0xFF);
+
+	iType.alwaysOnTop = (iType.alwaysOnTopOrder != 0);
+
+	if (pos + 7 > bufSize) {
+		return false;
+	}
+
+	uint8_t width = buf[pos++];
+	uint8_t height = buf[pos++];
+	if (width > 1 || height > 1) {
+		if (!skipBytes(pos, 1)) {
+			return false;
+		}
+	}
+
+	uint8_t layers = buf[pos++];
+	uint8_t patternX = buf[pos++];
+	uint8_t patternY = buf[pos++];
+	uint8_t patternZ = buf[pos++];
+	uint8_t frames = buf[pos++];
+	iType.isAnimation = (frames > 1);
+
+	if (frames > 1) {
+		if (!skipBytes(pos, 1 + 4 + 1 + (static_cast<size_t>(frames) * 8))) {
+			return false;
+		}
+	}
+
+	uint32_t numSprites = static_cast<uint32_t>(width) * height * layers * patternX * patternY * patternZ * frames;
+	const uint32_t spriteIdBytes = extendedSprites ? 4 : 2;
+	if (!skipBytes(pos, static_cast<size_t>(spriteIdBytes) * numSprites)) {
+		return false;
+	}
+
+	return true;
 }
 
 uint16_t Items::getItemIdByName(const std::string& name) {

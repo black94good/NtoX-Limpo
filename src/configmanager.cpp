@@ -174,6 +174,7 @@ bool ConfigManager::load() {
 		string[MYSQL_PASS] = getGlobalString(L, "mysqlPass", "");
 		string[MYSQL_DB] = getGlobalString(L, "mysqlDatabase", "forgottenserver");
 		string[MYSQL_SOCK] = getGlobalString(L, "mysqlSock", "");
+		string[ASSETS_DAT_PATH] = getGlobalString(L, "assetsDatPath", "data/items/assets.dat");
 
 		integer[SQL_PORT] = getGlobalNumber(L, "mysqlPort", 3306);
 
