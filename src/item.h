@@ -1032,6 +1032,16 @@ class Item : virtual public Thing {
 		bool isRemoved() const override {
 			return !getParent() || getParent()->isRemoved();
 		}
+		
+		//TOOLTIPS
+		void setRealUID(uint32_t uid) {
+			realUId = uid;
+		}
+
+		uint32_t getRealUID() const {
+			return realUId;
+		}
+		//TOOLTIPS END
 
 	protected:
 		uint16_t id; // the same id as in ItemType
@@ -1042,6 +1052,7 @@ class Item : virtual public Thing {
 		std::unique_ptr<ItemAttributes> attributes;
 
 		uint32_t referenceCounter = 0;
+		uint32_t realUId = 0;
 
 		uint8_t count = 1; // number of stacked items
 

@@ -1201,6 +1201,8 @@ class Player final : public Creature {
 			clientLowLevelBonusDisplay = value;
 		}
 
+		Item* getItemByUID(uint32_t uid) const;
+
 		using Creature::onWalk;
 
 	private:
